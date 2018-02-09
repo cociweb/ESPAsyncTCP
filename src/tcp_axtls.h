@@ -57,7 +57,7 @@ extern "C" {
 
 typedef void (* tcp_ssl_data_cb_t)(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
 typedef void (* tcp_ssl_handshake_cb_t)(void *arg, struct tcp_pcb *tcp, SSL *ssl);
-typedef void (* tcp_ssl_error_cb_t)(void *arg, struct tcp_pcb *tcp, int8_t error);
+typedef void (* tcp_ssl_error_cb_t)(void *arg, struct tcp_pcb *tcp, err_t error);
 typedef int (* tcp_ssl_file_cb_t)(void *arg, const char *filename, uint8_t **buf);
 
 uint8_t tcp_ssl_has_client();

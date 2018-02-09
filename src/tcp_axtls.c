@@ -104,6 +104,7 @@ uint8_t tcp_ssl_has_client(){
 
 tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
 
+  TCP_SSL_DEBUG("axTLS %s\n", ssl_version());
   if(tcp_ssl_next_fd < 0){
     tcp_ssl_next_fd = 0;//overflow
   }

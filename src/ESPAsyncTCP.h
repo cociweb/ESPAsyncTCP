@@ -49,7 +49,7 @@ typedef struct SSL_CTX_ SSL_CTX;
 
 typedef std::function<void(void*, AsyncClient*)> AcConnectHandler;
 typedef std::function<void(void*, AsyncClient*, size_t len, uint32_t time)> AcAckHandler;
-typedef std::function<void(void*, AsyncClient*, int8_t error)> AcErrorHandler;
+typedef std::function<void(void*, AsyncClient*, err_t error)> AcErrorHandler;
 typedef std::function<void(void*, AsyncClient*, void *data, size_t len)> AcDataHandler;
 typedef std::function<void(void*, AsyncClient*, struct pbuf *pb)> AcPacketHandler;
 typedef std::function<void(void*, AsyncClient*, uint32_t time)> AcTimeoutHandler;
@@ -95,7 +95,7 @@ class AsyncClient {
     err_t _connected(void* pcb, err_t err);
     void _error(err_t err);
 #if ASYNC_TCP_SSL_ENABLED
-    void _ssl_error(int8_t err);
+    void _ssl_error(err_t err);
 #endif
     err_t _poll(tcp_pcb* pcb);
     err_t _sent(tcp_pcb* pcb, uint16_t len);
@@ -117,7 +117,7 @@ class AsyncClient {
 #if ASYNC_TCP_SSL_ENABLED
     static void _s_data(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
     static void _s_handshake(void *arg, struct tcp_pcb *tcp, SSL *ssl);
-    static void _s_ssl_error(void *arg, struct tcp_pcb *tcp, int8_t err);
+    static void _s_ssl_error(void *arg, struct tcp_pcb *tcp, err_t err);
 #endif
 
   public:

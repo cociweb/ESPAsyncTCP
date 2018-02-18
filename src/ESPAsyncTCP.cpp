@@ -361,6 +361,8 @@ void AsyncClient::_error(err_t err) {
 #if ASYNC_TCP_SSL_ENABLED
 void AsyncClient::_ssl_error(err_t err){
   TCP_SSL_DEBUG("SSL error: %d", err);
+  if(_error_cb)
+    _error_cb(_error_cb_arg, this, err);
 }
 #endif
 
@@ -817,8 +819,10 @@ AsyncServer::AsyncServer(uint16_t port)
 #if ASYNC_TCP_SSL_ENABLED
   , _pending(NULL)
   , _ssl_ctx(NULL)
+#if ASYNC_TCP_SSL_AXTLS
   , _file_cb(0)
   , _file_cb_arg(0)
+#endif
 #endif
 {}
 
@@ -832,10 +836,23 @@ void AsyncServer::onClient(AcConnectHandler cb, void* arg){
 }
 
 #if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_AXTLS
 void AsyncServer::onSslFileRequest(AcSSlFileHandler cb, void* arg){
   _file_cb = cb;
   _file_cb_arg = arg;
 }
+int AsyncServer::_cert(const char *filename, uint8_t **buf){
+  if(_file_cb){
+    return _file_cb(_file_cb_arg, filename, buf);
+  }
+  *buf = 0;
+  return 0;
+}
+
+int AsyncServer::_s_cert(void *arg, const char *filename, uint8_t **buf){
+  return reinterpret_cast<AsyncServer*>(arg)->_cert(filename, buf);
+}
+#endif
 #endif
 
 void AsyncServer::begin(){
@@ -1060,18 +1077,6 @@ err_t AsyncServer::_recv(struct tcp_pcb *pcb, struct pbuf *pb, err_t err){
     }
   }
   return ERR_OK;
-}
-
-int AsyncServer::_cert(const char *filename, uint8_t **buf){
-  if(_file_cb){
-    return _file_cb(_file_cb_arg, filename, buf);
-  }
-  *buf = 0;
-  return 0;
-}
-
-int AsyncServer::_s_cert(void *arg, const char *filename, uint8_t **buf){
-  return reinterpret_cast<AsyncServer*>(arg)->_cert(filename, buf);
 }
 
 err_t AsyncServer::_s_poll(void *arg, struct tcp_pcb *pcb){

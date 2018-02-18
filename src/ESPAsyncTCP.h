@@ -207,7 +207,9 @@ class AsyncClient {
 };
 
 #if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_AXTLS
 typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> AcSSlFileHandler;
+#endif
 struct pending_pcb;
 #endif
 
@@ -222,19 +224,23 @@ class AsyncServer {
 #if ASYNC_TCP_SSL_ENABLED
     struct pending_pcb * _pending;
     SSL_CTX * _ssl_ctx;
+#if ASYNC_TCP_SSL_AXTLS
     AcSSlFileHandler _file_cb;
     void* _file_cb_arg;
 #endif
+#endif
 
   public:
-
     AsyncServer(IPAddress addr, uint16_t port);
     AsyncServer(uint16_t port);
     ~AsyncServer();
     void onClient(AcConnectHandler cb, void* arg);
 #if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_AXTLS
     void onSslFileRequest(AcSSlFileHandler cb, void* arg);
     void beginSecure(const char *cert, const char *private_key_file, const char *password);
+    static int _s_cert(void *arg, const char *filename, uint8_t **buf);
+#endif
 #endif
     void begin();
     void end();
@@ -249,7 +255,6 @@ class AsyncServer {
     int _cert(const char *filename, uint8_t **buf);
     err_t _poll(tcp_pcb* pcb);
     err_t _recv(tcp_pcb *pcb, struct pbuf *pb, err_t err);
-    static int _s_cert(void *arg, const char *filename, uint8_t **buf);
     static err_t _s_poll(void *arg, struct tcp_pcb *tpcb);
     static err_t _s_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *pb, err_t err);
 #endif

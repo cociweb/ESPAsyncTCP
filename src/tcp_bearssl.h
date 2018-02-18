@@ -19,8 +19,9 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 /*
- * Compatibility for AxTLS with LWIP raw tcp mode (http://lwip.wikia.com/wiki/Raw/TCP)
+ * Compatibility for BearSSL with LWIP raw tcp mode (http://lwip.wikia.com/wiki/Raw/TCP)
  * Original Code and Inspiration: Slavey Karadzhov
+ * Adopted from tcp_axtls.h by Zhenyu Wu @2018/02
  */
 
 #ifndef LWIPR_COMPAT_H
@@ -28,7 +29,7 @@
 
 #include <async_config.h>
 
-#if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_AXTLS
+#if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
 
 #include "lwipopts.h"
 /*
@@ -41,13 +42,15 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
-#include "include/ssl.h"
+#include "include/bearssl.h"
 
-#define ERR_TCP_SSL_INVALID_SSL           -101
-#define ERR_TCP_SSL_INVALID_TCP           -102
-#define ERR_TCP_SSL_INVALID_CLIENTFD      -103
-#define ERR_TCP_SSL_INVALID_CLIENTFD_DATA -104
-#define ERR_TCP_SSL_INVALID_DATA          -105
+#define ERR_TCP_SSL_INVALID_TCP           -101
+#define ERR_TCP_SSL_INVALID_TCP_DATA      -102
+#define ERR_TCP_SSL_INVALID_SSL_REC       -103
+#define ERR_TCP_SSL_INVALID_SSL_STATE     -104
+#define ERR_TCP_SSL_INVALID_SSL_DATA      -105
+#define ERR_TCP_SSL_INVALID_APP_DATA      -106
+#define ERR_TCP_SSL_OUTOFMEMORY           -107
 
 #define TCP_SSL_TYPE_CLIENT 0
 #define TCP_SSL_TYPE_SERVER 1
@@ -55,14 +58,36 @@ extern "C" {
 #define tcp_ssl_ssl_write(A, B, C) tcp_ssl_write(A, B, C)
 #define tcp_ssl_ssl_read(A, B) tcp_ssl_read(A, B)
 
+struct SSL_CTX_ {
+  br_ssl_engine_context *_eng;
+  br_x509_minimal_context _x509_minimal;
+  unsigned char* _iobuf_in;
+  unsigned char* _iobuf_out;
+  int _iobuf_in_size;
+  int _iobuf_out_size;
+  const br_x509_trust_anchor *_ta;
+  int _ta_num;
+};
+
+struct SSL_ {
+  br_ssl_client_context* _cc;
+  br_ssl_server_context* _sc;
+};
+
 typedef void (* tcp_ssl_data_cb_t)(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
 typedef void (* tcp_ssl_handshake_cb_t)(void *arg, struct tcp_pcb *tcp, SSL *ssl);
 typedef void (* tcp_ssl_error_cb_t)(void *arg, struct tcp_pcb *tcp, err_t error);
-typedef int (* tcp_ssl_file_cb_t)(void *arg, const char *filename, uint8_t **buf);
 
 uint8_t tcp_ssl_has_client();
 
-int tcp_ssl_new_client(struct tcp_pcb *tcp);
+typedef int (* tcp_ssl_cert_cb_t)(void *arg, uint8_t dn_hash[32], uint8_t **buf);
+
+void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg);
+
+#define DEFAULT_IN_BUF_SIZE   BR_SSL_BUFSIZE_INPUT
+#define DEFAULT_OUT_BUF_SIZE  837
+
+int tcp_ssl_new_client(struct tcp_pcb *tcp, int _in_buf_size = DEFAULT_IN_BUF_SIZE, int _out_buf_size = DEFAULT_OUT_BUF_SIZE);
 
 SSL_CTX * tcp_ssl_new_server_ctx(const char *cert, const char *private_key_file, const char *password);
 int tcp_ssl_new_server(struct tcp_pcb *tcp, SSL_CTX* ssl_ctx);
@@ -71,13 +96,8 @@ int tcp_ssl_is_server(struct tcp_pcb *tcp);
 int tcp_ssl_free(struct tcp_pcb *tcp);
 int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p);
 
-#ifdef AXTLS_2_0_0_SNDBUF
-int tcp_ssl_sndbuf(struct tcp_pcb *tcp);
-#endif
-
 int tcp_ssl_write(struct tcp_pcb *tcp, uint8_t *data, size_t len);
-
-void tcp_ssl_file(tcp_ssl_file_cb_t cb, void * arg);
+void tcp_ssl_outbuf_pump(struct tcp_pcb *tcp);
 
 void tcp_ssl_arg(struct tcp_pcb *tcp, void * arg);
 void tcp_ssl_data(struct tcp_pcb *tcp, tcp_ssl_data_cb_t arg);

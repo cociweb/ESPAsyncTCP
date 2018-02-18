@@ -23,7 +23,8 @@
  * Original Code and Inspiration: Slavey Karadzhov
  */
 #include <async_config.h>
-#if ASYNC_TCP_SSL_ENABLED
+
+#if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_AXTLS
 
 #include "lwip/opt.h"
 #include "lwip/tcp.h"

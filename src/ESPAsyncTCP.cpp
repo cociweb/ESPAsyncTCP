@@ -404,8 +404,6 @@ uint32_t AsyncClient::getHandshakeTimeout(){
 
 err_t AsyncClient::_sent(tcp_pcb* pcb, uint16_t len) {
   _rx_last_packet = millis();
-  _tx_unacked_len -= len;
-  _tx_acked_len += len;
 
 #if ASYNC_TCP_SSL_ENABLED
   if(_pcb_secure){
@@ -423,6 +421,8 @@ err_t AsyncClient::_sent(tcp_pcb* pcb, uint16_t len) {
   }
 #endif
 
+  _tx_unacked_len -= len;
+  _tx_acked_len += len;
   ASYNC_TCP_DEBUG("_sent: %u (%d %d)\n", len, _tx_unacked_len, _tx_acked_len);
   if(_tx_unacked_len == 0){
     _pcb_busy = false;

@@ -422,6 +422,10 @@ SSL * tcp_ssl_get_ssl(struct tcp_pcb *tcp){
   return NULL;
 }
 
+void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx) {
+  ssl_ctx_free(ssl_ctx);
+}
+
 bool tcp_ssl_has(struct tcp_pcb *tcp){
   return tcp_ssl_get(tcp) != NULL;
 }

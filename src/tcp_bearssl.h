@@ -24,8 +24,8 @@
  * Adopted from tcp_axtls.h by Zhenyu Wu @2018/02
  */
 
-#ifndef LWIPR_COMPAT_H
-#define LWIPR_COMPAT_H
+#ifndef ASYNCTCP_SSL_BEARSSL_H
+#define ASYNCTCP_SSL_BEARSSL_H
 
 #include <async_config.h>
 
@@ -51,12 +51,19 @@ extern "C" {
 #define ERR_TCP_SSL_INVALID_SSL_DATA      -105
 #define ERR_TCP_SSL_INVALID_APP_DATA      -106
 #define ERR_TCP_SSL_OUTOFMEMORY           -107
+#define SSL_CLOSE_NOTIFY                  -200
 
 #define TCP_SSL_TYPE_CLIENT 0
 #define TCP_SSL_TYPE_SERVER 1
 
 #define tcp_ssl_ssl_write(A, B, C) tcp_ssl_write(A, B, C)
 #define tcp_ssl_ssl_read(A, B) tcp_ssl_read(A, B)
+
+struct SSL_ {
+  br_ssl_client_context* _cc;
+  br_ssl_server_context* _sc;
+};
+typedef struct SSL_ SSL;
 
 struct SSL_CTX_ {
   br_ssl_engine_context *_eng;
@@ -65,14 +72,9 @@ struct SSL_CTX_ {
   unsigned char* _iobuf_out;
   int _iobuf_in_size;
   int _iobuf_out_size;
-  const br_x509_trust_anchor *_ta;
-  int _ta_num;
+  int _pending_send;
 };
-
-struct SSL_ {
-  br_ssl_client_context* _cc;
-  br_ssl_server_context* _sc;
-};
+typedef struct SSL_CTX_ SSL_CTX;
 
 typedef void (* tcp_ssl_data_cb_t)(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
 typedef void (* tcp_ssl_handshake_cb_t)(void *arg, struct tcp_pcb *tcp, SSL *ssl);
@@ -80,14 +82,15 @@ typedef void (* tcp_ssl_error_cb_t)(void *arg, struct tcp_pcb *tcp, err_t error)
 
 uint8_t tcp_ssl_has_client();
 
-typedef int (* tcp_ssl_cert_cb_t)(void *arg, uint8_t dn_hash[32], uint8_t **buf);
+typedef int (* tcp_ssl_cert_cb_t)(void *arg, void *dn_hash, size_t dn_hash_len, uint8_t **buf);
 
 void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg);
 
 #define DEFAULT_IN_BUF_SIZE   BR_SSL_BUFSIZE_INPUT
 #define DEFAULT_OUT_BUF_SIZE  837
 
-int tcp_ssl_new_client(struct tcp_pcb *tcp, int _in_buf_size = DEFAULT_IN_BUF_SIZE, int _out_buf_size = DEFAULT_OUT_BUF_SIZE);
+int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName);
+int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf_size, int _out_buf_size);
 
 SSL_CTX * tcp_ssl_new_server_ctx(const char *cert, const char *private_key_file, const char *password);
 int tcp_ssl_new_server(struct tcp_pcb *tcp, SSL_CTX* ssl_ctx);
@@ -97,7 +100,7 @@ int tcp_ssl_free(struct tcp_pcb *tcp);
 int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p);
 
 int tcp_ssl_write(struct tcp_pcb *tcp, uint8_t *data, size_t len);
-void tcp_ssl_outbuf_pump(struct tcp_pcb *tcp);
+int tcp_ssl_outbuf_pump(struct tcp_pcb *tcp);
 
 void tcp_ssl_arg(struct tcp_pcb *tcp, void * arg);
 void tcp_ssl_data(struct tcp_pcb *tcp, tcp_ssl_data_cb_t arg);
@@ -105,6 +108,7 @@ void tcp_ssl_handshake(struct tcp_pcb *tcp, tcp_ssl_handshake_cb_t arg);
 void tcp_ssl_err(struct tcp_pcb *tcp, tcp_ssl_error_cb_t arg);
 
 SSL * tcp_ssl_get_ssl(struct tcp_pcb *tcp);
+void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx);
 bool tcp_ssl_has(struct tcp_pcb *tcp);
 
 #ifdef __cplusplus
@@ -115,4 +119,4 @@ bool tcp_ssl_has(struct tcp_pcb *tcp);
 
 #endif /* ASYNC_TCP_SSL_ENABLED */
 
-#endif /* LWIPR_COMPAT_H */
+#endif /* ASYNCTCP_SSL_BEARSSL_H */

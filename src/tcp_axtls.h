@@ -23,8 +23,8 @@
  * Original Code and Inspiration: Slavey Karadzhov
  */
 
-#ifndef LWIPR_COMPAT_H
-#define LWIPR_COMPAT_H
+#ifndef ASYNCTCP_SSL_AXTLS_H
+#define ASYNCTCP_SSL_AXTLS_H
 
 #include <async_config.h>
 
@@ -85,6 +85,7 @@ void tcp_ssl_handshake(struct tcp_pcb *tcp, tcp_ssl_handshake_cb_t arg);
 void tcp_ssl_err(struct tcp_pcb *tcp, tcp_ssl_error_cb_t arg);
 
 SSL * tcp_ssl_get_ssl(struct tcp_pcb *tcp);
+void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx);
 bool tcp_ssl_has(struct tcp_pcb *tcp);
 
 #ifdef __cplusplus
@@ -95,4 +96,4 @@ bool tcp_ssl_has(struct tcp_pcb *tcp);
 
 #endif /* ASYNC_TCP_SSL_ENABLED */
 
-#endif /* LWIPR_COMPAT_H */
+#endif /* ASYNCTCP_SSL_AXTLS_H */

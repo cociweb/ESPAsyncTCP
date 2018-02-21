@@ -212,6 +212,7 @@ static br_x509_trust_anchor* ssl_new_ta(void) {
         TCP_SSL_DEBUG("ssl_new_ta: failed to allocate trust anchor buffer\n");
         return NULL;
     }
+    memset(ta, 0, sizeof(br_x509_trust_anchor));
     return ta;
 }
 

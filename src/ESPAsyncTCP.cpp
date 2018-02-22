@@ -61,6 +61,10 @@ AsyncClient::AsyncClient(tcp_pcb* pcb):
   , _handshake_done(true)
   , _handshake_start(0)
   , _handshake_timeout(ASYNC_MAX_HANDSHAKE_TIME)
+#if ASYNC_TCP_SSL_BEARSSL
+  , _ssl_in_buf_size(BEARSSL_DEFAULT_IN_BUF_SIZE)
+  , _ssl_out_buf_size(BEARSSL_DEFAULT_OUT_BUF_SIZE)
+#endif
 #endif
   , _pcb_sent_at(0)
   , _close_pcb(false)
@@ -308,6 +312,9 @@ err_t AsyncClient::_connected(void* pcb, err_t err){
   _pcb = reinterpret_cast<tcp_pcb*>(pcb);
   if(_pcb){
     _pcb_busy = false;
+    _tx_unacked_len = 0;
+    _tx_acked_len = 0;
+    _tx_unsent_len = 0;
     _rx_last_packet = millis();
     tcp_setprio(_pcb, TCP_PRIO_MIN);
     tcp_recv(_pcb, &_s_recv);
@@ -316,7 +323,7 @@ err_t AsyncClient::_connected(void* pcb, err_t err){
 #if ASYNC_TCP_SSL_ENABLED
     if(_pcb_secure){
 #if ASYNC_TCP_SSL_BEARSSL
-      if(tcp_ssl_new_client(_pcb, _hostname.c_str()) < 0){
+      if(tcp_ssl_new_client_ex(_pcb, _hostname.c_str(), _ssl_in_buf_size, _ssl_out_buf_size) < 0){
 #endif
 #if ASYNC_TCP_SSL_AXTLS
       if(tcp_ssl_new_client(_pcb) < 0){
@@ -691,6 +698,17 @@ SSL * AsyncClient::getSSL(){
   }
   return NULL;
 }
+
+#if ASYNC_TCP_SSL_BEARSSL
+void AsyncClient::setInBufSize(int size) {
+  _ssl_in_buf_size = size;
+}
+
+void AsyncClient::setOutBufSize(int size) {
+  _ssl_out_buf_size = size;
+}
+#endif
+
 #endif
 
 uint8_t AsyncClient::state() {

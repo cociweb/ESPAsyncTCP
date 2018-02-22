@@ -86,6 +86,10 @@ class AsyncClient {
     bool _handshake_done;
     uint32_t _handshake_start;
     uint32_t _handshake_timeout;
+#if ASYNC_TCP_SSL_BEARSSL
+    int _ssl_in_buf_size;
+    int _ssl_out_buf_size;
+#endif
 #endif
     uint32_t _pcb_sent_at;
     bool _close_pcb;
@@ -168,6 +172,10 @@ class AsyncClient {
 
 #if ASYNC_TCP_SSL_ENABLED
     SSL *getSSL();
+#if ASYNC_TCP_SSL_BEARSSL
+    void setInBufSize(int size);
+    void setOutBufSize(int size);
+#endif
     uint32_t getHandshakeTimeout();
     void setHandshakeTimeout(uint32_t timeout);//no handshake timeout for the connection in milliseconds
 #endif

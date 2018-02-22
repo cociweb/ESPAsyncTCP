@@ -86,8 +86,8 @@ typedef int (* tcp_ssl_cert_cb_t)(void *arg, void *dn_hash, size_t dn_hash_len, 
 
 void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg);
 
-#define DEFAULT_IN_BUF_SIZE   BR_SSL_BUFSIZE_INPUT
-#define DEFAULT_OUT_BUF_SIZE  837
+#define BEARSSL_DEFAULT_IN_BUF_SIZE   BR_SSL_BUFSIZE_INPUT
+#define BEARSSL_DEFAULT_OUT_BUF_SIZE  837
 
 int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName);
 int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf_size, int _out_buf_size);

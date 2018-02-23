@@ -90,6 +90,14 @@
 #define NET_DEBUG(...)
 #endif
 
+static void ets_puts_P(const char *romString) {
+    char c = pgm_read_byte(romString++);
+    while (c) {
+        ets_putc(c);
+        c = pgm_read_byte(romString++);
+    }
+}
+
 static uint8_t _tcp_ssl_has_client = 0;
 
 SSL_CTX * tcp_ssl_new_server_ctx(const char *cert, const char *private_key_file, const char *password){
@@ -311,70 +319,79 @@ static const br_x509_trust_anchor *findHashedTA(void *dn_hash, size_t dn_hash_le
         br_x509_decoder_init(dc, NULL, NULL, NULL, NULL);
         br_x509_decoder_push(dc, certbuf, certlen);
 
-        br_x509_pkey *pk = br_x509_decoder_get_pkey(dc);
-        if (!pk) {
-            free(dc);
-            TCP_SSL_DEBUG("findHashedTA: failed to get cert public key\n");
-            return NULL;
-        }
-        TA_DEBUG("Creating new trust anchor...\n");
-        br_x509_trust_anchor *ta = ssl_new_ta();
-        if (!ta) {
-            free(dc);
-            TCP_SSL_DEBUG("findHashedTA: failed to allocate trust anchor\n");
-            return NULL;
-        }
-        if (br_x509_decoder_isCA(dc)) {
-            ta->flags |= BR_X509_TA_CA;
-        }
-        free(dc); // Done with x509 decoder
-        TA_DEBUG("Releasing decoder...\n");
+        br_x509_trust_anchor *ta = NULL;
+        do {
+            br_x509_pkey *pk = br_x509_decoder_get_pkey(dc);
+            if (!pk) {
+                TCP_SSL_DEBUG("findHashedTA: failed to get cert public key\n");
+                break;
+            }
+            TA_DEBUG("Creating new trust anchor...\n");
+            ta = ssl_new_ta();
+            if (!ta) {
+                TCP_SSL_DEBUG("findHashedTA: failed to allocate trust anchor\n");
+                break;
+            }
+            if (br_x509_decoder_isCA(dc)) {
+                ta->flags |= BR_X509_TA_CA;
+            }
 
-        switch (pk->key_type) {
-            case BR_KEYTYPE_RSA:
-                ta->pkey.key_type = BR_KEYTYPE_RSA;
-                HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
-                HEAP_DEBUG("malloc(RSA-n) %d\n", pk->key.rsa.nlen);
-                ta->pkey.key.rsa.n = (uint8_t*)malloc(pk->key.rsa.nlen);
-                if (!ta->pkey.key.rsa.n) {
+            switch (pk->key_type) {
+                case BR_KEYTYPE_RSA:
+                    ta->pkey.key_type = BR_KEYTYPE_RSA;
+                    HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
+                    HEAP_DEBUG("malloc(RSA-n) %d\n", pk->key.rsa.nlen);
+                    //{char a[32]; sprintf(a,"malloc(RSA-n) %d\n", pk->key.rsa.nlen); ets_puts_P(a);}
+                    ta->pkey.key.rsa.n = (uint8_t*)malloc(pk->key.rsa.nlen);
+                    if (!ta->pkey.key.rsa.n) {
+                        freeHashedTA(ta);
+                        ta = NULL;
+                        TCP_SSL_DEBUG("findHashedTA: failed to allocate RSA-n\n");
+                        break;
+                    }
+                    memcpy(ta->pkey.key.rsa.n, pk->key.rsa.n, pk->key.rsa.nlen);
+                    ta->pkey.key.rsa.nlen = pk->key.rsa.nlen;
+                    HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
+                    HEAP_DEBUG("malloc(RSA-e) %d\n", pk->key.rsa.elen);
+                    //{char a[32]; sprintf(a,"malloc(RSA-e): %d\n", pk->key.rsa.elen); ets_puts_P(a);}
+                    ta->pkey.key.rsa.e = (uint8_t*)malloc(pk->key.rsa.elen);
+                    if (!ta->pkey.key.rsa.e) {
+                        freeHashedTA(ta);
+                        ta = NULL;
+                        ets_puts_P("findHashedTA: failed to allocate RSA-e\n");
+                        break;
+                    }
+                    memcpy(ta->pkey.key.rsa.e, pk->key.rsa.e, pk->key.rsa.elen);
+                    ta->pkey.key.rsa.elen = pk->key.rsa.elen;
+                    break;
+
+                case BR_KEYTYPE_EC:
+                    ta->pkey.key_type = BR_KEYTYPE_EC;
+                    ta->pkey.key.ec.curve = pk->key.ec.curve;
+                    HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
+                    HEAP_DEBUG("malloc(EC-q) %d\n", pk->key.ec.qlen);
+                    //{char a[32]; sprintf(a,"malloc(EC-q): %d\n", pk->key.ec.qlen); ets_puts_P(a);}
+                    ta->pkey.key.ec.q = (uint8_t*)malloc(pk->key.ec.qlen);
+                    if (!ta->pkey.key.ec.q) {
+                        freeHashedTA(ta);
+                        ta = NULL;
+                        TCP_SSL_DEBUG("findHashedTA: failed to allocate EC-q\n");
+                        break;
+                    }
+                    memcpy(ta->pkey.key.ec.q, pk->key.ec.q, pk->key.ec.qlen);
+                    ta->pkey.key.ec.qlen = pk->key.ec.qlen;
+                    break;
+
+                default:
                     freeHashedTA(ta);
-                    TCP_SSL_DEBUG("findHashedTA: failed to allocate RSA-n\n");
-                    return NULL;
-                }
-                memcpy(ta->pkey.key.rsa.n, pk->key.rsa.n, pk->key.rsa.nlen);
-                ta->pkey.key.rsa.nlen = pk->key.rsa.nlen;
-                HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
-                HEAP_DEBUG("malloc(RSA-e) %d\n", pk->key.rsa.elen);
-                ta->pkey.key.rsa.e = (uint8_t*)malloc(pk->key.rsa.elen);
-                if (!ta->pkey.key.rsa.e) {
-                    freeHashedTA(ta->pkey.key.rsa.n);
-                    TCP_SSL_DEBUG("findHashedTA: failed to allocate RSA-e\n");
-                    return NULL;
-                }
-                memcpy(ta->pkey.key.rsa.e, pk->key.rsa.e, pk->key.rsa.elen);
-                ta->pkey.key.rsa.elen = pk->key.rsa.elen;
-                return ta;
+                    ta = NULL;
+                    TCP_SSL_DEBUG("findHashedTA: unrecognised key type (%d)\n", pk->key_type);
+                    //{char a[32]; sprintf(a,"key type: %d\n", pk->key_type); ets_puts_P(a);}
+            }
+        } while(false);
 
-            case BR_KEYTYPE_EC:
-                ta->pkey.key_type = BR_KEYTYPE_EC;
-                ta->pkey.key.ec.curve = pk->key.ec.curve;
-                HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
-                HEAP_DEBUG("malloc(EC-q) %d\n", pk->key.ec.qlen);
-                ta->pkey.key.ec.q = (uint8_t*)malloc(pk->key.ec.qlen);
-                if (!ta->pkey.key.ec.q) {
-                    freeHashedTA(ta);
-                    TCP_SSL_DEBUG("findHashedTA: failed to allocate EC-q\n");
-                    return NULL;
-                }
-                memcpy(ta->pkey.key.ec.q, pk->key.ec.q, pk->key.ec.qlen);
-                ta->pkey.key.ec.qlen = pk->key.ec.qlen;
-                return ta;
-
-            default:
-                freeHashedTA(ta);
-                TCP_SSL_DEBUG("findHashedTA: unrecognised key type\n");
-                return NULL;
-        }
+        free(dc);
+        return ta;
     }
     return NULL;
 }
@@ -629,14 +646,6 @@ int tcp_ssl_outbuf_pump(struct tcp_pcb *tcp) {
  *      > 0 - the length of the clear text characters that were read
  */
 
-static void ets_puts_P(const char *romString) {
-    char c = pgm_read_byte(romString++);
-    while (c) {
-        ets_putc(c);
-        c = pgm_read_byte(romString++);
-    }
-}
-
 int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
   if(!tcp) {
     return ERR_TCP_SSL_INVALID_TCP;
@@ -699,10 +708,10 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
             const char *desc;
             if (find_error_name(ssl_error, &desc)) {
               ets_puts_P(desc);
+              ets_putc('\n');
             } else {
-              TCP_SSL_DEBUG("error (%d)", ssl_error);
+              TCP_SSL_DEBUG("error (%d)\n", ssl_error);
             }
-            ets_putc('\n');
           );
           total_bytes = -1000 - ssl_error;
           break;
@@ -714,10 +723,10 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
               const char *desc;
               if (find_error_name(ssl_error, &desc)) {
                 ets_puts_P(desc);
+                ets_putc('\n');
               } else {
-                TCP_SSL_DEBUG("error (%d)", ssl_error);
+                TCP_SSL_DEBUG("error (%d)\n", ssl_error);
               }
-              ets_putc('\n');
             )
             tcp_abort(tcp);
           } else {

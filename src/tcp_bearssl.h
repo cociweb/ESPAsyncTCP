@@ -86,8 +86,15 @@ typedef int (* tcp_ssl_cert_cb_t)(void *arg, void *dn_hash, size_t dn_hash_len, 
 
 void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg);
 
-#define BEARSSL_DEFAULT_IN_BUF_SIZE   BR_SSL_BUFSIZE_INPUT
-#define BEARSSL_DEFAULT_OUT_BUF_SIZE  837
+#define BEARSSL_BUF_OVERHEAD            325
+#define BEARSSL_BUF_MINIMUM_DATALEN     512
+#define BEARSSL_BUF_NEGOTIATE_DATALEN_0 BEARSSL_BUF_MINIMUM_DATALEN
+#define BEARSSL_BUF_NEGOTIATE_DATALEN_1 (BEARSSL_BUF_NEGOTIATE_DATALEN_0 * 2)
+#define BEARSSL_BUF_NEGOTIATE_DATALEN_2 (BEARSSL_BUF_NEGOTIATE_DATALEN_1 * 2)
+#define BEARSSL_BUF_NEGOTIATE_DATALEN_3 (BEARSSL_BUF_NEGOTIATE_DATALEN_2 * 2)
+#define BEARSSL_BUF_DEFAULT_DATALEN     16384
+#define BEARSSL_DEFAULT_IN_BUF_SIZE     (BEARSSL_BUF_DEFAULT_DATALEN + BEARSSL_BUF_OVERHEAD)
+#define BEARSSL_DEFAULT_OUT_BUF_SIZE    (BEARSSL_BUF_MINIMUM_DATALEN + BEARSSL_BUF_OVERHEAD)
 
 int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName);
 int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf_size, int _out_buf_size);

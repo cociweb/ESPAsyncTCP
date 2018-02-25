@@ -1,30 +1,15 @@
-# ESPAsyncTCP [![Build Status](https://travis-ci.org/me-no-dev/ESPAsyncTCP.svg?branch=master)](https://travis-ci.org/me-no-dev/ESPAsyncTCP)
-Async TCP Library for ESP8266 Arduino
-
-For ESP32 look [HERE](https://github.com/me-no-dev/AsyncTCP)
-
-[![Join the chat at https://gitter.im/me-no-dev/ESPAsyncWebServer](https://badges.gitter.im/me-no-dev/ESPAsyncWebServer.svg)](https://gitter.im/me-no-dev/ESPAsyncWebServer?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+# ESPAsyncTCP
+[![Build Status](https://travis-ci.org/Adam5Wu/ESPAsyncTCP.svg?branch=adam5wu/master)](https://travis-ci.org/Adam5Wu/ESPAsyncTCP)
+[![GitHub issues](https://img.shields.io/github/issues/Adam5Wu/ESPAsyncTCP.svg)](https://github.com/Adam5Wu/ESPAsyncTCP/issues)
+[![GitHub forks](https://img.shields.io/github/forks/Adam5Wu/ESPAsyncTCP.svg)](https://github.com/Adam5Wu/ESPAsyncTCP/network)
+[![License](https://img.shields.io/github/license/Adam5Wu/ESPAsyncTCP.svg)](./LICENSE)
 
 This is a fully asynchronous TCP library, aimed at enabling trouble-free, multi-connection network environment for Espressif's ESP8266 MCUs.
+Adopted to works with BearSSL port, which brings compatiblility with brokers using ECDSA certificates, and supports SNI and [maximum fragment length negotiation](https://tools.ietf.org/html/rfc6066#page-8).
 
-This library is the base for [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
-
-## AsyncClient and AsyncServer
-The base classes on which everything else is built. They expose all possible scenarios, but are really raw and require more skills to use.
-
-## AsyncPrinter
-This class can be used to send data like any other ```Print``` interface (```Serial``` for example).
-The object then can be used outside of the Async callbacks (the loop) and receive asynchronously data using ```onData```. The object can be checked if the underlying ```AsyncClient```is connected, or hook to the ```onDisconnect``` callback.
-
-## AsyncTCPbuffer
-This class is really similar to the ```AsyncPrinter```, but it differs in the fact that it can buffer some of the incoming data.
-
-## SyncClient
-It is exactly what it sounds like. This is a standard, blocking TCP Client, similar to the one included in ```ESP8266WiFi```
-
-## Libraries and projects that use AsyncTCP
-- [ESP Async Web Server](https://github.com/me-no-dev/ESPAsyncWebServer)
-- [Async MQTT client](https://github.com/marvinroger/async-mqtt-client)
-- [arduinoWebSockets](https://github.com/Links2004/arduinoWebSockets)
-- [ESP8266 Smart Home](https://github.com/baruch/esp8266_smart_home)
-- [KBox Firmware](https://github.com/sarfata/kbox-firmware)
+* [Upstream Project](https://github.com/me-no-dev/ESPAsyncTCP)
+* [Modifications of this fork](MODIFICATIONS.md)
+* Requires:
+	- [ESP8266 Arduino Core fork](https://github.com/Adam5Wu/Arduino)
+* Potentially interesting:
+	- [ESP8266 BearSSL Port fork](https://github.com/Adam5Wu/bearssl-esp8266)

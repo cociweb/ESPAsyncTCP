@@ -5,7 +5,8 @@
 [![License](https://img.shields.io/github/license/Adam5Wu/ESPAsyncTCP.svg)](./LICENSE.txt)
 
 This is a fully asynchronous TCP library, aimed at enabling trouble-free, multi-connection network environment for Espressif's ESP8266 MCUs.
-Adopted to works with BearSSL port, which brings compatiblility with brokers using ECDSA certificates, and supports SNI and [maximum fragment length negotiation](https://tools.ietf.org/html/rfc6066#page-8).
+
+Modified to works with BearSSL port, which brings compatiblility with brokers using ECDSA certificates, supports SNI, and [maximum fragment length negotiation](https://tools.ietf.org/html/rfc6066#page-8).
 
 * [Upstream Project](https://github.com/me-no-dev/ESPAsyncTCP-esp8266)
 * [Modifications of this fork](MODIFICATIONS.md)

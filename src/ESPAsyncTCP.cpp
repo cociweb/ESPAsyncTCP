@@ -394,9 +394,9 @@ void AsyncClient::_error(err_t err) {
 #if ASYNC_TCP_SSL_ENABLED
 void AsyncClient::_ssl_error(err_t err){
   ASYNC_TCP_DEBUG("SSL error: %d\n", err);
-//  if(_error_cb) {
-//    _error_cb(_error_cb_arg, this, err);
-//  }
+  if(_error_cb) {
+    _error_cb(_error_cb_arg, this, err);
+  }
 }
 
 void AsyncClient::setHandshakeTimeout(uint32_t timeout){

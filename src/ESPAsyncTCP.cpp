@@ -116,18 +116,18 @@ bool AsyncClient::connect(IPAddress ip, uint16_t port, bool secure, const char* 
 #else
 bool AsyncClient::connect(IPAddress ip, uint16_t port){
 #endif
-  if (_pcb) //already connected
+  if(_pcb) //already connected
     return false;
   ip_addr_t addr;
   addr.addr = ip;
 #if LWIP_VERSION_MAJOR == 1
   netif* interface = ip_route(&addr);
-  if (!interface){ //no route to host
+  if(!interface){ //no route to host
     return false;
   }
 #endif
   tcp_pcb* pcb = tcp_new();
-  if (!pcb){ //could not allocate pcb
+  if(!pcb){ //could not allocate pcb
     return false;
   }
 
@@ -167,11 +167,11 @@ bool AsyncClient::connect(const char* host, uint16_t port){
 }
 
 AsyncClient& AsyncClient::operator=(const AsyncClient& other){
-  if (_pcb)
+  if(_pcb)
     _close();
 
   _pcb = other._pcb;
-  if (_pcb) {
+  if(_pcb) {
     _rx_last_packet = millis();
     tcp_setprio(_pcb, TCP_PRIO_MIN);
     tcp_arg(_pcb, this);
@@ -236,7 +236,7 @@ size_t AsyncClient::write(const char* data) {
 
 size_t AsyncClient::write(const char* data, size_t size, uint8_t apiflags) {
   size_t will_send = add(data, size, apiflags);
-  if (will_send > 0) {
+  if(will_send > 0) {
     if(!send()) return 0;
   }
   return will_send;
@@ -245,12 +245,12 @@ size_t AsyncClient::write(const char* data, size_t size, uint8_t apiflags) {
 size_t AsyncClient::add(const char* data, size_t size, uint8_t apiflags) {
   if(!_pcb) return ERR_CONN;
   size_t room = space();
-  if (!room || !size) return 0;
-  if (!data) return ERR_VAL;
+  if(!room || !size) return 0;
+  if(!data) return ERR_VAL;
 #if ASYNC_TCP_SSL_ENABLED
   if(_pcb_secure){
     int sent = tcp_ssl_write(_pcb, (uint8_t*)data, size);
-    if (sent < 0) {
+    if(sent < 0) {
       _close();
       return sent;
     }
@@ -273,10 +273,10 @@ size_t AsyncClient::add(const char* data, size_t size, uint8_t apiflags) {
 bool AsyncClient::send(){
 #if ASYNC_TCP_SSL_ENABLED
   if(_pcb_secure) {
-    if (_handshake_done) return false;
+    if(_handshake_done) return false;
 #if ASYNC_TCP_SSL_BEARSSL
     int pumped = tcp_ssl_outbuf_pump(_pcb);
-    if (pumped) {
+    if(pumped) {
       _pcb_busy = true;
       _pcb_sent_at = millis();
       _tx_unacked_len += pumped;
@@ -286,14 +286,16 @@ bool AsyncClient::send(){
     return true;
   }
 #endif
-  if(tcp_output(_pcb) == ERR_OK){
+  err_t err = tcp_output(_pcb);
+  if(err == ERR_OK){
     _pcb_busy = true;
     _pcb_sent_at = millis();
     _tx_unacked_len += _tx_unsent_len;
     _tx_unsent_len = 0;
     return true;
   }
-  _tx_unsent_len = 0;
+  ASYNC_TCP_DEBUG("send: tcp_output error %d\n", err);
+  //_tx_unsent_len = 0;
   return false;
 }
 
@@ -417,9 +419,9 @@ err_t AsyncClient::_sent(tcp_pcb* pcb, uint16_t len) {
 #if ASYNC_TCP_SSL_BEARSSL
     int pumped = tcp_ssl_outbuf_pump(pcb);
 #endif
-    if (!_handshake_done) return ERR_OK;
+    if(!_handshake_done) return ERR_OK;
 #if ASYNC_TCP_SSL_BEARSSL
-    if (pumped) {
+    if(pumped) {
       //_pcb_busy = true;
       _pcb_sent_at = _rx_last_packet;
       _tx_unacked_len+= pumped;
@@ -452,7 +454,7 @@ err_t AsyncClient::_recv(tcp_pcb* pcb, pbuf* pb, err_t err) {
     ASYNC_TCP_DEBUG("_recv: %d\n", pb->tot_len);
     int read_bytes = tcp_ssl_read(pcb, pb);
     if(read_bytes < 0){
-      if (read_bytes != SSL_CLOSE_NOTIFY) {
+      if(read_bytes != SSL_CLOSE_NOTIFY) {
         _ssl_error(read_bytes);
         tcp_abort(pcb);
         return ERR_ABRT;
@@ -494,28 +496,42 @@ err_t AsyncClient::_poll(tcp_pcb* pcb){
   uint32_t now = millis();
 
   // ACK Timeout
-  if(_pcb_busy && _ack_timeout && (now - _pcb_sent_at) >= _ack_timeout){
-    _pcb_busy = false;
-    if(_timeout_cb)
-      _timeout_cb(_timeout_cb_arg, this, (now - _pcb_sent_at));
-    return ERR_OK;
+  if(_pcb_busy && _ack_timeout) {
+    uint32_t time_delta = now - _pcb_sent_at;
+    if(time_delta >= _ack_timeout){
+      ASYNC_TCP_DEBUG("_poll: ack timeout %d\n", time_delta);
+      _pcb_busy = false;
+      if(_timeout_cb)
+        _timeout_cb(_timeout_cb_arg, this, time_delta);
+      return ERR_OK;
+    }
   }
   // RX Timeout
-  if(_rx_since_timeout && (now - _rx_last_packet) >= (_rx_since_timeout * 1000)){
-    _close();
-    return ERR_OK;
+  if(_rx_since_timeout) {
+    uint32_t time_delta = now - _rx_last_packet;
+    if(time_delta >= (_rx_since_timeout * 1000)){
+      ASYNC_TCP_DEBUG("_poll: rx timeout %d\n", time_delta);
+      if(_timeout_cb)
+        _timeout_cb(_timeout_cb_arg, this, time_delta);
+      return ERR_OK;
+    }
   }
 #if ASYNC_TCP_SSL_ENABLED
   // SSL Handshake Timeout
-  if(_pcb_secure && !_handshake_done && (now - _handshake_start) >= _handshake_timeout){
-    abort();
-    return ERR_OK;
+  if(_pcb_secure && !_handshake_done) {
+    uint32_t time_delta = now - _rx_last_packet;
+    if(time_delta >= _handshake_timeout){
+      ASYNC_TCP_DEBUG("_poll: handshake timeout %d\n", time_delta);
+      if(_timeout_cb)
+        _timeout_cb(_timeout_cb_arg, this, time_delta);
+      return ERR_OK;
+    }
   }
   if(_pcb_secure){
 #if ASYNC_TCP_SSL_BEARSSL
     int pumped = tcp_ssl_outbuf_pump(pcb);
-    if (pumped) {
-      if (_handshake_done) {
+    if(pumped) {
+      if(_handshake_done) {
         _pcb_busy = true;
         _pcb_sent_at = now;
         _tx_unacked_len+= pumped;
@@ -718,7 +734,7 @@ uint8_t AsyncClient::state() {
 }
 
 bool AsyncClient::connected(){
-  if (!_pcb)
+  if(!_pcb)
     return false;
 #if ASYNC_TCP_SSL_ENABLED
   return _pcb->state == 4 && _handshake_done;
@@ -728,25 +744,25 @@ bool AsyncClient::connected(){
 }
 
 bool AsyncClient::connecting(){
-  if (!_pcb)
+  if(!_pcb)
     return false;
   return _pcb->state > 0 && _pcb->state < 4;
 }
 
 bool AsyncClient::disconnecting(){
-  if (!_pcb)
+  if(!_pcb)
     return false;
   return _pcb->state > 4 && _pcb->state < 10;
 }
 
 bool AsyncClient::disconnected(){
-  if (!_pcb)
+  if(!_pcb)
     return true;
   return _pcb->state == 0 || _pcb->state == 10;
 }
 
 bool AsyncClient::freeable(){
-  if (!_pcb)
+  if(!_pcb)
     return true;
   return _pcb->state == 0 || _pcb->state > 4;
 }
@@ -962,7 +978,7 @@ void AsyncServer::begin(){
 
   int8_t err;
   tcp_pcb* pcb = tcp_new();
-  if (!pcb){
+  if(!pcb){
     return;
   }
 
@@ -970,13 +986,13 @@ void AsyncServer::begin(){
   local_addr.addr = (uint32_t) _addr;
   err = tcp_bind(pcb, &local_addr, _port);
 
-  if (err != ERR_OK) {
+  if(err != ERR_OK) {
     tcp_close(pcb);
     return;
   }
 
   tcp_pcb* listen_pcb = tcp_listen(pcb);
-  if (!listen_pcb) {
+  if(!listen_pcb) {
     tcp_close(pcb);
     return;
   }
@@ -1023,7 +1039,7 @@ bool AsyncServer::getNoDelay(){
 }
 
 uint8_t AsyncServer::status(){
-  if (!_pcb)
+  if(!_pcb)
     return 0;
   return _pcb->state;
 }
@@ -1031,9 +1047,9 @@ uint8_t AsyncServer::status(){
 err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
   if(_connect_cb){
 #if ASYNC_TCP_SSL_ENABLED
-    if (_noDelay || _ssl_ctx)
+    if(_noDelay || _ssl_ctx)
 #else
-    if (_noDelay)
+    if(_noDelay)
 #endif
       tcp_nagle_disable(pcb);
     else

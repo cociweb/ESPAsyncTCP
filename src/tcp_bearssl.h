@@ -82,7 +82,7 @@ typedef void (* tcp_ssl_error_cb_t)(void *arg, struct tcp_pcb *tcp, err_t error)
 
 uint8_t tcp_ssl_has_client();
 
-typedef int (* tcp_ssl_cert_cb_t)(void *arg, void *dn_hash, size_t dn_hash_len, uint8_t **buf);
+typedef int (* tcp_ssl_cert_cb_t)(void *arg, struct tcp_pcb *tcp, void *dn_hash, size_t dn_hash_len, uint8_t **buf);
 
 void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg);
 

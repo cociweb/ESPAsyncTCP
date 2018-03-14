@@ -299,12 +299,12 @@ static void freeHashedTA(const br_x509_trust_anchor *ta) {
     free((void*)ta);
 }
 
-static const br_x509_trust_anchor *findHashedTA(void *dn_hash, size_t dn_hash_len) {
+static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t dn_hash_len) {
     TA_DEBUG("findHashedTA: finding trusted certificate...\n");
     uint8_t *certbuf;
     int certlen = 0;
     if (_tcp_ssl_cert_cb) {
-        certlen = _tcp_ssl_cert_cb(_tcp_ssl_cert_arg, dn_hash, dn_hash_len, &certbuf);
+        certlen = _tcp_ssl_cert_cb(_tcp_ssl_cert_arg, (struct tcp_pcb *)ctx, dn_hash, dn_hash_len, &certbuf);
     }
     if (certlen) {
         // Feed the dog before it bites
@@ -396,7 +396,7 @@ static const br_x509_trust_anchor *findHashedTA(void *dn_hash, size_t dn_hash_le
     return NULL;
 }
 
-static br_ssl_client_context* br_ssl_client_new(SSL_CTX* ctx) {
+static br_ssl_client_context* br_ssl_client_new(struct tcp_pcb *tcp, SSL_CTX* ctx) {
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(br_ssl_client_context) %d\n", sizeof(br_ssl_client_context));
     br_ssl_client_context* cc = (br_ssl_client_context*)malloc(sizeof(br_ssl_client_context));
@@ -435,7 +435,7 @@ static br_ssl_client_context* br_ssl_client_new(SSL_CTX* ctx) {
             hc = hashes[id - 1];
             br_x509_minimal_set_hash(&ctx->_x509_minimal, id, hc);
         }
-        br_x509_minimal_set_dynamic(&ctx->_x509_minimal, findHashedTA, freeHashedTA);
+        br_x509_minimal_set_dynamic(&ctx->_x509_minimal, tcp, findHashedTA, freeHashedTA);
         br_ssl_engine_set_x509(engine, &ctx->_x509_minimal.vtable);
         br_ssl_engine_set_buffers_bidi(engine, ctx->_iobuf_in, ctx->_iobuf_in_size, ctx->_iobuf_out, ctx->_iobuf_out_size);
     }
@@ -517,7 +517,7 @@ int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf
     return ERR_TCP_SSL_OUTOFMEMORY;
   }
 
-  tcp_ssl->ssl = br_ssl_client_new(tcp_ssl->ssl_ctx);
+  tcp_ssl->ssl = br_ssl_client_new(tcp, tcp_ssl->ssl_ctx);
   if(!tcp_ssl->ssl){
     TCP_SSL_DEBUG("tcp_ssl_new_client: failed to allocate ssl client\n");
     return ERR_TCP_SSL_OUTOFMEMORY;

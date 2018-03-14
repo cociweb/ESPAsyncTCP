@@ -285,7 +285,7 @@ static br_x509_trust_anchor* ssl_new_ta(void) {
     return ta;
 }
 
-static void freeHashedTA(const br_x509_trust_anchor *ta) {
+static void freeHashedTA(void *ctx, const br_x509_trust_anchor *ta) {
     switch (ta->pkey.key_type) {
         case BR_KEYTYPE_RSA:
             if (ta->pkey.key.rsa.e) free(ta->pkey.key.rsa.e);
@@ -344,7 +344,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     //{char a[32]; sprintf(a,"malloc(RSA-n) %d\n", pk->key.rsa.nlen); ets_puts_P(a);}
                     ta->pkey.key.rsa.n = (uint8_t*)malloc(pk->key.rsa.nlen);
                     if (!ta->pkey.key.rsa.n) {
-                        freeHashedTA(ta);
+                        freeHashedTA(ctx, ta);
                         ta = NULL;
                         TCP_SSL_DEBUG("findHashedTA: failed to allocate RSA-n\n");
                         break;
@@ -356,7 +356,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     //{char a[32]; sprintf(a,"malloc(RSA-e): %d\n", pk->key.rsa.elen); ets_puts_P(a);}
                     ta->pkey.key.rsa.e = (uint8_t*)malloc(pk->key.rsa.elen);
                     if (!ta->pkey.key.rsa.e) {
-                        freeHashedTA(ta);
+                        freeHashedTA(ctx, ta);
                         ta = NULL;
                         ets_puts_P("findHashedTA: failed to allocate RSA-e\n");
                         break;
@@ -373,7 +373,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     //{char a[32]; sprintf(a,"malloc(EC-q): %d\n", pk->key.ec.qlen); ets_puts_P(a);}
                     ta->pkey.key.ec.q = (uint8_t*)malloc(pk->key.ec.qlen);
                     if (!ta->pkey.key.ec.q) {
-                        freeHashedTA(ta);
+                        freeHashedTA(ctx, ta);
                         ta = NULL;
                         TCP_SSL_DEBUG("findHashedTA: failed to allocate EC-q\n");
                         break;
@@ -383,7 +383,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     break;
 
                 default:
-                    freeHashedTA(ta);
+                    freeHashedTA(ctx, ta);
                     ta = NULL;
                     TCP_SSL_DEBUG("findHashedTA: unrecognised key type (%d)\n", pk->key_type);
                     //{char a[32]; sprintf(a,"key type: %d\n", pk->key_type); ets_puts_P(a);}

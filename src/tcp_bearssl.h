@@ -52,9 +52,12 @@ extern "C" {
 #define ERR_TCP_SSL_INVALID_APP_DATA      -106
 #define ERR_TCP_SSL_OUTOFMEMORY           -107
 #define SSL_CLOSE_NOTIFY                  -200
-
-#define TCP_SSL_TYPE_CLIENT 0
-#define TCP_SSL_TYPE_SERVER 1
+#define SSL_CANNOT_READ                   -201
+    
+#define TCP_SSL_TYPE_CLIENT_ALL           0x0F
+#define TCP_SSL_TYPE_CLIENT_CONNECTED     0x01
+#define TCP_SSL_TYPE_CLIENT_HANDSHAKED    0x02
+#define TCP_SSL_TYPE_SERVER_ALL           0xF0
 
 #define tcp_ssl_ssl_write(A, B, C) tcp_ssl_write(A, B, C)
 #define tcp_ssl_ssl_read(A, B) tcp_ssl_read(A, B)

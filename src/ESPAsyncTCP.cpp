@@ -454,12 +454,21 @@ err_t AsyncClient::_recv(tcp_pcb* pcb, pbuf* pb, err_t err) {
     ASYNC_TCP_DEBUG("_recv: %d\n", pb->tot_len);
     int read_bytes = tcp_ssl_read(pcb, pb);
     if(read_bytes < 0){
-      if(read_bytes != SSL_CLOSE_NOTIFY) {
-        _ssl_error(read_bytes);
-        tcp_abort(pcb);
-        return ERR_ABRT;
+      switch (read_bytes) {
+        case SSL_CLOSE_NOTIFY:
+          // All data processed at TCP layer
+          // Report normal read
+          break;
+        case SSL_CANNOT_READ:
+          // SSL engine unable to take the data
+          // Report out-of-memory
+          return ERR_MEM;
+        default:
+          // Unexpected error, abort connection
+          _ssl_error(read_bytes);
+          tcp_abort(pcb);
+          return ERR_ABRT;
       }
-      //return read_bytes;
     }
     return ERR_OK;
   }

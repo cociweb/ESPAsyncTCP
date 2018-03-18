@@ -27,6 +27,8 @@
 
 #if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
 
+#include "user_interface.h"
+
 #include "pgmspace.h"
 #include "lwip/opt.h"
 #include "lwip/tcp.h"
@@ -44,8 +46,12 @@
 #define BEARSSL_HEAPDEBUG   0
 #endif
 
+#ifndef BEARSSL_HSDEBUG
+#define BEARSSL_HSDEBUG     1
+#endif
+
 #ifndef BEARSSL_READDEBUG
-#define BEARSSL_READDEBUG   1
+#define BEARSSL_READDEBUG   0
 #endif
 
 #ifndef BEARSSL_WRITEDEBUG
@@ -64,6 +70,12 @@
 #define HEAP_DEBUG(...) TCP_SSL_DEBUG(__VA_ARGS__)
 #else
 #define HEAP_DEBUG(...)
+#endif
+
+#if BEARSSL_HSDEBUG
+#define HS_DEBUG(...) TCP_SSL_DEBUG(__VA_ARGS__)
+#else
+#define HS_DEBUG(...)
 #endif
 
 #if BEARSSL_READDEBUG
@@ -110,7 +122,8 @@ struct tcp_ssl_pcb {
   SSL_CTX* ssl_ctx;
   SSL* ssl;
   uint8_t type;
-  uint8_t handshake;
+  uint16_t handshake_offset;
+  struct pbuf *handshake;
   void * arg;
   tcp_ssl_data_cb_t on_data;
   tcp_ssl_handshake_cb_t on_handshake;
@@ -121,6 +134,11 @@ struct tcp_ssl_pcb {
 typedef struct tcp_ssl_pcb tcp_ssl_t;
 
 static tcp_ssl_t * tcp_ssl_array = NULL;
+
+#define HANDSHAKE_RES 100
+static tcp_ssl_t * tcp_ssl_hsptr = NULL;
+static os_timer_t handshake_timer = {0};
+static void tcp_ssl_handshake_pump();
 
 uint8_t tcp_ssl_has_client(){
   return _tcp_ssl_has_client;
@@ -142,7 +160,7 @@ tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
   }
   memset(new_item, 0, sizeof(tcp_ssl_t));
   new_item->tcp = tcp;
-  new_item->type = TCP_SSL_TYPE_CLIENT;
+  new_item->type = TCP_SSL_TYPE_CLIENT_CONNECTED;
 
   if(tcp_ssl_array){
     new_item->next = tcp_ssl_array;
@@ -151,7 +169,7 @@ tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(Alt-stack) %d\n", BEARSSL_STACKSIZE);
     _bearssl_stack = (uint8_t*)malloc(BEARSSL_STACKSIZE);
-    if (_bearssl_stack) {
+    if(_bearssl_stack) {
       br_esp8266_stack_proxy_init(_bearssl_stack, BEARSSL_STACKSIZE);
     } else {
       TCP_SSL_DEBUG("tcp_ssl_new: failed to allocate bearssl alt-stack\n");
@@ -159,6 +177,8 @@ tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
       return NULL;
     }
 #endif
+    os_timer_setfn(&handshake_timer, tcp_ssl_handshake_pump, NULL);
+    os_timer_arm(&handshake_timer, HANDSHAKE_RES, true);
   }
   tcp_ssl_array = new_item;
   return new_item;
@@ -176,10 +196,10 @@ tcp_ssl_t* tcp_ssl_get(struct tcp_pcb *tcp) {
 }
 
 void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx) {
-    if (ssl_ctx->_iobuf_out) {
+    if(ssl_ctx->_iobuf_out) {
         free(ssl_ctx->_iobuf_out);
     }
-    if (ssl_ctx->_iobuf_in) {
+    if(ssl_ctx->_iobuf_in) {
         free(ssl_ctx->_iobuf_in);
     }
     free(ssl_ctx);
@@ -277,7 +297,7 @@ static br_x509_trust_anchor* ssl_new_ta(void) {
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(br_x509_trust_anchor) %d\n", sizeof(br_x509_trust_anchor));
     br_x509_trust_anchor *ta = (br_x509_trust_anchor*)malloc(sizeof(br_x509_trust_anchor));
-    if (!ta) {
+    if(!ta) {
         TCP_SSL_DEBUG("ssl_new_ta: failed to allocate trust anchor buffer\n");
         return NULL;
     }
@@ -288,12 +308,12 @@ static br_x509_trust_anchor* ssl_new_ta(void) {
 static void freeHashedTA(void *ctx, const br_x509_trust_anchor *ta) {
     switch (ta->pkey.key_type) {
         case BR_KEYTYPE_RSA:
-            if (ta->pkey.key.rsa.e) free(ta->pkey.key.rsa.e);
-            if (ta->pkey.key.rsa.n) free(ta->pkey.key.rsa.n);
+            if(ta->pkey.key.rsa.e) free(ta->pkey.key.rsa.e);
+            if(ta->pkey.key.rsa.n) free(ta->pkey.key.rsa.n);
             break;
 
         case BR_KEYTYPE_EC:
-            if (ta->pkey.key.ec.q) free(ta->pkey.key.ec.q);
+            if(ta->pkey.key.ec.q) free(ta->pkey.key.ec.q);
             break;
     }
     free((void*)ta);
@@ -303,16 +323,16 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
     TA_DEBUG("findHashedTA: finding trusted certificate...\n");
     uint8_t *certbuf;
     int certlen = 0;
-    if (_tcp_ssl_cert_cb) {
+    if(_tcp_ssl_cert_cb) {
         certlen = _tcp_ssl_cert_cb(_tcp_ssl_cert_arg, (struct tcp_pcb *)ctx, dn_hash, dn_hash_len, &certbuf);
     }
-    if (certlen) {
+    if(certlen) {
         // Feed the dog before it bites
         system_soft_wdt_feed();
         HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
         HEAP_DEBUG("malloc(br_x509_decoder_context) %d\n", sizeof(br_x509_decoder_context));
         br_x509_decoder_context *dc =(br_x509_decoder_context*)malloc(sizeof(br_x509_decoder_context));
-        if (!dc) {
+        if(!dc) {
             TCP_SSL_DEBUG("findHashedTA: failed to create x509 decoder\n");
             return NULL;
         }
@@ -322,17 +342,17 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
         br_x509_trust_anchor *ta = NULL;
         do {
             br_x509_pkey *pk = br_x509_decoder_get_pkey(dc);
-            if (!pk) {
+            if(!pk) {
                 TCP_SSL_DEBUG("findHashedTA: failed to get cert public key\n");
                 break;
             }
             TA_DEBUG("Creating new trust anchor...\n");
             ta = ssl_new_ta();
-            if (!ta) {
+            if(!ta) {
                 TCP_SSL_DEBUG("findHashedTA: failed to allocate trust anchor\n");
                 break;
             }
-            if (br_x509_decoder_isCA(dc)) {
+            if(br_x509_decoder_isCA(dc)) {
                 ta->flags |= BR_X509_TA_CA;
             }
 
@@ -343,7 +363,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     HEAP_DEBUG("malloc(RSA-n) %d\n", pk->key.rsa.nlen);
                     //{char a[32]; sprintf(a,"malloc(RSA-n) %d\n", pk->key.rsa.nlen); ets_puts_P(a);}
                     ta->pkey.key.rsa.n = (uint8_t*)malloc(pk->key.rsa.nlen);
-                    if (!ta->pkey.key.rsa.n) {
+                    if(!ta->pkey.key.rsa.n) {
                         freeHashedTA(ctx, ta);
                         ta = NULL;
                         TCP_SSL_DEBUG("findHashedTA: failed to allocate RSA-n\n");
@@ -355,7 +375,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     HEAP_DEBUG("malloc(RSA-e) %d\n", pk->key.rsa.elen);
                     //{char a[32]; sprintf(a,"malloc(RSA-e): %d\n", pk->key.rsa.elen); ets_puts_P(a);}
                     ta->pkey.key.rsa.e = (uint8_t*)malloc(pk->key.rsa.elen);
-                    if (!ta->pkey.key.rsa.e) {
+                    if(!ta->pkey.key.rsa.e) {
                         freeHashedTA(ctx, ta);
                         ta = NULL;
                         ets_puts_P("findHashedTA: failed to allocate RSA-e\n");
@@ -372,7 +392,7 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
                     HEAP_DEBUG("malloc(EC-q) %d\n", pk->key.ec.qlen);
                     //{char a[32]; sprintf(a,"malloc(EC-q): %d\n", pk->key.ec.qlen); ets_puts_P(a);}
                     ta->pkey.key.ec.q = (uint8_t*)malloc(pk->key.ec.qlen);
-                    if (!ta->pkey.key.ec.q) {
+                    if(!ta->pkey.key.ec.q) {
                         freeHashedTA(ctx, ta);
                         ta = NULL;
                         TCP_SSL_DEBUG("findHashedTA: failed to allocate EC-q\n");
@@ -400,7 +420,7 @@ static br_ssl_client_context* br_ssl_client_new(struct tcp_pcb *tcp, SSL_CTX* ct
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(br_ssl_client_context) %d\n", sizeof(br_ssl_client_context));
     br_ssl_client_context* cc = (br_ssl_client_context*)malloc(sizeof(br_ssl_client_context));
-    if (cc != NULL) {
+    if(cc != NULL) {
         br_ssl_client_zero(cc);
         br_ssl_engine_context *engine = &cc->eng;
 
@@ -442,10 +462,10 @@ static br_ssl_client_context* br_ssl_client_new(struct tcp_pcb *tcp, SSL_CTX* ct
     return cc;
 }
 
-int tcp_ssl_outbuf_pump_int(struct tcp_pcb *tcp, tcp_ssl_t* tcp_ssl) {
+static int tcp_ssl_outbuf_pump_int(struct tcp_pcb *tcp, tcp_ssl_t* tcp_ssl) {
     SSL_CTX *ctx = tcp_ssl->ssl_ctx;
     br_ssl_engine_context *engine = ctx->_eng;
-    if (ctx->_pending_send) {
+    if(ctx->_pending_send) {
         ctx->_pending_send = 0;
         br_ssl_engine_flush(engine, 0);
     }
@@ -455,16 +475,16 @@ int tcp_ssl_outbuf_pump_int(struct tcp_pcb *tcp, tcp_ssl_t* tcp_ssl) {
     while (state & BR_SSL_SENDREC) {
         size_t buf_len = 0;
         unsigned char *send_buf = br_ssl_engine_sendrec_buf(engine, &buf_len);
-        if (send_buf) {
+        if(send_buf) {
             unsigned char tcp_len = tcp_sndbuf(tcp);
             int to_send = tcp_len > buf_len ? buf_len : tcp_len;
-            if (!to_send) break;
+            if(!to_send) break;
             NET_DEBUG("tcp_ssl_outbuf_pump_int: writing %d / %d\n", to_send, buf_len);
             err_t err = tcp_write(tcp, send_buf, to_send, TCP_WRITE_FLAG_COPY);
             // Feed the dog before it bites
             system_soft_wdt_feed();
             if(err < ERR_OK) {
-                if (err == ERR_MEM) {
+                if(err == ERR_MEM) {
                     TCP_SSL_DEBUG("tcp_ssl_outbuf_pump_int: No memory for %d\n", to_send);
                     to_send = 0;
                 } else {
@@ -480,7 +500,7 @@ int tcp_ssl_outbuf_pump_int(struct tcp_pcb *tcp, tcp_ssl_t* tcp_ssl) {
         state = br_ssl_engine_current_state(engine);
     }
 
-    if (send_len) {
+    if(send_len) {
         NET_DEBUG("tcp_ssl_outbuf_pump_int: sending %d to network\n", send_len);
         err_t err = tcp_output(tcp);
         if(err != ERR_OK) {
@@ -523,7 +543,7 @@ int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf
     return ERR_TCP_SSL_OUTOFMEMORY;
   }
 
-  if (!br_ssl_client_reset(tcp_ssl->ssl, hostName, 0)) {
+  if(!br_ssl_client_reset(tcp_ssl->ssl, hostName, 0)) {
     TCP_SSL_DEBUG("tcp_ssl_new_client: failed to reset\n");
     return ERR_TCP_SSL_INVALID_SSL_STATE;
   }
@@ -556,28 +576,35 @@ int tcp_ssl_free(struct tcp_pcb *tcp) {
     return ERR_TCP_SSL_INVALID_SSL_REC;
   }
 
-  if (prev) {
+  if(prev) {
     prev->next = cur->next;
   } else {
     tcp_ssl_array = cur->next;
   }
+  if(cur == tcp_ssl_hsptr) {
+    tcp_ssl_hsptr = cur->next? cur->next : tcp_ssl_array;
+  }
+  if(cur->handshake) {
+    pbuf_free(cur->handshake);
+  }
   if(cur->ssl) {
     free(cur->ssl);
   }
-  if(cur->type == TCP_SSL_TYPE_CLIENT && cur->ssl_ctx) {
+  if((cur->type & TCP_SSL_TYPE_CLIENT_ALL) && cur->ssl_ctx) {
     tcp_ssl_ctx_free(cur->ssl_ctx);
   }
-  if(cur->type == TCP_SSL_TYPE_SERVER) {
+  if(cur->type & TCP_SSL_TYPE_SERVER_ALL) {
     _tcp_ssl_has_client = 0;
   }
   free(cur);
 
+  if(!tcp_ssl_array) {
 #if BEARSSL_ALTSTACK
-  if (!tcp_ssl_array) {
     free(_bearssl_stack);
     _bearssl_stack = NULL;
-  }
 #endif
+    os_timer_disarm(&handshake_timer);
+  }
   return 0;
 }
 
@@ -599,20 +626,20 @@ int tcp_ssl_write(struct tcp_pcb *tcp, uint8_t *data, size_t len) {
   SSL_CTX *ctx = tcp_ssl->ssl_ctx;
   br_ssl_engine_context *engine = ctx->_eng;
   unsigned state = br_ssl_engine_current_state(engine);
-  if ((state & BR_SSL_SENDAPP) == 0) {
+  if((state & BR_SSL_SENDAPP) == 0) {
     TCP_SSL_DEBUG("tcp_ssl_write: not ready for send\n");
     return 0;
   }
 
   size_t sendapp_len;
   unsigned char *sendapp_buf = br_ssl_engine_sendapp_buf(engine, &sendapp_len);
-  if (sendapp_buf) {
+  if(sendapp_buf) {
     int to_send = len > sendapp_len ? sendapp_len : len;
     memcpy(sendapp_buf, data, to_send);
     br_ssl_engine_sendapp_ack(engine, to_send);
     ctx->_pending_send += to_send;
     WRITE_DEBUG("tcp_ssl_write: request %u, wrote %u\r\n", len, to_send);
-    if (sendapp_len == to_send) {
+    if(sendapp_len == to_send) {
         // when app buffer is filled, flush is done automatically
         ctx->_pending_send = 0;
         return tcp_ssl_outbuf_pump_int(tcp, tcp_ssl);
@@ -628,11 +655,110 @@ int tcp_ssl_outbuf_pump(struct tcp_pcb *tcp) {
 
     tcp_ssl_t * tcp_ssl = tcp_ssl_get(tcp);
     if(!tcp_ssl){
-        TCP_SSL_DEBUG("tcp_ssl_write: tcp_ssl is NULL\n");
+        TCP_SSL_DEBUG("tcp_ssl_outbuf_pump: tcp_ssl is NULL\n");
         return ERR_TCP_SSL_INVALID_SSL_REC;
     }
 
     return tcp_ssl_outbuf_pump_int(tcp, tcp_ssl);
+}
+
+static bool tcp_ssl_handshake_consume(struct tcp_ssl_pcb *tcp_ssl, int amount) {
+    struct pbuf *pbuf_handshake = tcp_ssl->handshake;
+    int offset_new = tcp_ssl->handshake_offset + amount;
+    while (tcp_ssl->handshake) {
+        int head_len = tcp_ssl->handshake->len;
+        if(head_len > offset_new) {
+            tcp_ssl->handshake_offset = offset_new;
+            break;
+        }
+        struct pbuf *head = tcp_ssl->handshake;
+        tcp_ssl->handshake = tcp_ssl->handshake->next;
+        offset_new -= head_len;
+        if (!tcp_ssl->handshake) {
+            if (offset_new) {
+                // Should not reach!
+                HS_DEBUG("tcp_ssl_handshake_consume: "
+                    "over-consumed by %d\n", offset_new);
+            }
+            tcp_ssl->handshake_offset = 0;
+        } else {
+            pbuf_ref(tcp_ssl->handshake);
+        }
+        HS_DEBUG("tcp_ssl_handshake_consume: "
+            "discarding pbuf of %d\n", head_len);
+        pbuf_free(head);
+    }
+    return pbuf_handshake != tcp_ssl->handshake;
+}
+
+static void tcp_ssl_handshake_pump() {
+    time_t startTS = micros64();
+    if(!tcp_ssl_hsptr)
+        tcp_ssl_hsptr = tcp_ssl_array;
+    while(tcp_ssl_hsptr){
+        struct pbuf *pbuf_handshake = tcp_ssl_hsptr->handshake;
+        if(!pbuf_handshake) break;
+        int buflen = pbuf_handshake->tot_len - tcp_ssl_hsptr->handshake_offset;
+        br_ssl_engine_context *engine = tcp_ssl_hsptr->ssl_ctx->_eng;
+        unsigned state = br_ssl_engine_current_state(engine);
+        while ((state & BR_SSL_RECVREC) && buflen) {
+            int _recv_len = 0;
+            unsigned char *recv_buf = br_ssl_engine_recvrec_buf(engine, &_recv_len);
+            if(recv_buf) {
+                int to_copy = _recv_len < buflen ? _recv_len : buflen;
+                HS_DEBUG("tcp_ssl_handshake_pump: consuming %d / %d\n",
+                    to_copy, buflen);
+                to_copy = pbuf_copy_partial(pbuf_handshake, recv_buf, to_copy,
+                    tcp_ssl_hsptr->handshake_offset);
+                HS_DEBUG("tcp_ssl_handshake_pump: consumed %d\n", to_copy);
+                if (tcp_ssl_handshake_consume(tcp_ssl_hsptr,to_copy))
+                    pbuf_handshake = tcp_ssl_hsptr->handshake;
+                buflen -= to_copy;
+                br_ssl_engine_recvrec_ack(engine, to_copy);
+
+                state = br_ssl_engine_current_state(engine);
+                if(state & BR_SSL_CLOSED) {
+                    TCP_SSL_DEBUG("tcp_ssl_handshake_pump: handshake failed - ");
+                    int ssl_error = br_ssl_engine_last_error(engine);
+                    TCP_SSL_DEBUG_DO(
+                        const char *desc;
+                        if(find_error_name(ssl_error, &desc)) {
+                            ets_puts_P(desc);
+                            ets_putc('\n');
+                        } else {
+                            TCP_SSL_DEBUG("error (%d)\n", ssl_error);
+                        }
+                    );
+                    tcp_abort(tcp_ssl_hsptr->tcp);
+                } else if(state & BR_SSL_SENDAPP) {
+                    HS_DEBUG("tcp_ssl_handshake_pump: handshake successful\n");
+                    tcp_ssl_hsptr->type = TCP_SSL_TYPE_CLIENT_HANDSHAKED;
+                    if(tcp_ssl_hsptr->on_handshake) {
+                        tcp_ssl_hsptr->on_handshake(tcp_ssl_hsptr->arg,
+                            tcp_ssl_hsptr->tcp, tcp_ssl_hsptr->ssl);
+                    }
+                } else {
+                    time_t execSpan = micros64() - startTS;
+                    if (execSpan > HANDSHAKE_RES * 1000) break;
+                    continue;
+                }
+                // Cannot take any more data at this stage
+                if(buflen) {
+                    HS_DEBUG("tcp_ssl_handshake_pump: "
+                        "left-over buffer %d\n", buflen);
+                }
+                break;
+            } else {
+                // Should not reach!
+                HS_DEBUG("tcp_ssl_handshake_pump: "
+                    "engine cannot receive data\n");
+                break;
+            }
+        }
+        break;
+    }
+    if(tcp_ssl_hsptr)
+        tcp_ssl_hsptr = tcp_ssl_hsptr->next;
 }
 
 /**
@@ -664,34 +790,43 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
 
   br_ssl_engine_context *engine = tcp_ssl->ssl_ctx->_eng;
   unsigned state = br_ssl_engine_current_state(engine);
-  if ((state & BR_SSL_RECVREC) == 0) {
-    pbuf_free(p);
-    TCP_SSL_DEBUG("tcp_ssl_read: error - not ready for recv\n");
-    return ERR_TCP_SSL_INVALID_SSL_STATE;
+  if((state & BR_SSL_RECVREC) == 0) {
+    TCP_SSL_DEBUG("tcp_ssl_read: not ready for recv\n");
+    return SSL_CANNOT_READ;
   }
 
   int pbuf_size = p->tot_len;
+  if(tcp_ssl->type == TCP_SSL_TYPE_CLIENT_CONNECTED) {
+    // We are in handshake stage
+    // Computation may be heavy, do not process data here
+    NET_DEBUG("tcp_ssl_read: handshake +%d\n", pbuf_size);
+    if(!tcp_ssl->handshake) tcp_ssl->handshake = p;
+    else pbuf_cat(tcp_ssl->handshake, p);
+    tcp_recved(tcp, pbuf_size);
+    return pbuf_size;
+  }
+
   int pbuf_offset = 0;
   int total_bytes = 0;
   do {
     int _recv_len = 0;
     unsigned char *recv_buf = br_ssl_engine_recvrec_buf(engine, &_recv_len);
-    if (recv_buf) {
+    if(recv_buf) {
       int to_copy = _recv_len < pbuf_size ? _recv_len : pbuf_size;
       NET_DEBUG("tcp_ssl_read: consuming %d / %d\n", to_copy, pbuf_size);
       to_copy = pbuf_copy_partial(p, recv_buf, to_copy, pbuf_offset);
       READ_DEBUG("tcp_ssl_read: consumed %d\n", to_copy);
-      br_ssl_engine_recvrec_ack(engine, to_copy);
       pbuf_offset += to_copy;
       pbuf_size -= to_copy;
+      br_ssl_engine_recvrec_ack(engine, to_copy);
     }
     // Feed the dog before it bites
     system_soft_wdt_feed();
     state = br_ssl_engine_current_state(engine);
-    if (state & BR_SSL_RECVAPP) {
+    if(state & BR_SSL_RECVAPP) {
       _recv_len = 0;
       unsigned char *recv_buf = br_ssl_engine_recvapp_buf(engine, &_recv_len);
-      if (recv_buf) {
+      if(recv_buf) {
         READ_DEBUG("tcp_ssl_read: app data (%d)\n", _recv_len);
         if(tcp_ssl->on_data) {
           tcp_ssl->on_data(tcp_ssl->arg, tcp, recv_buf, _recv_len);
@@ -700,55 +835,31 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
         total_bytes += _recv_len;
       }
     } else {
-      if (state & BR_SSL_CLOSED) {
-        if (!tcp_ssl->handshake) {
-          TCP_SSL_DEBUG("tcp_ssl_read: handshake failed - ");
-          int ssl_error = br_ssl_engine_last_error(engine);
+      if(state & BR_SSL_CLOSED) {
+        int ssl_error = br_ssl_engine_last_error(engine);
+        if(ssl_error) {
+          TCP_SSL_DEBUG("tcp_ssl_read: connection failed - ");
           TCP_SSL_DEBUG_DO(
             const char *desc;
-            if (find_error_name(ssl_error, &desc)) {
+            if(find_error_name(ssl_error, &desc)) {
               ets_puts_P(desc);
               ets_putc('\n');
             } else {
               TCP_SSL_DEBUG("error (%d)\n", ssl_error);
             }
           );
-          total_bytes = -1000 - ssl_error;
-          break;
+          tcp_abort(tcp);
         } else {
-          int ssl_error = br_ssl_engine_last_error(engine);
-          if (ssl_error) {
-            TCP_SSL_DEBUG("tcp_ssl_read: connection failed - ");
-            TCP_SSL_DEBUG_DO(
-              const char *desc;
-              if (find_error_name(ssl_error, &desc)) {
-                ets_puts_P(desc);
-                ets_putc('\n');
-              } else {
-                TCP_SSL_DEBUG("error (%d)\n", ssl_error);
-              }
-            )
-            tcp_abort(tcp);
-          } else {
-            TCP_SSL_DEBUG("tcp_ssl_read: connection closed\n");
-          }
-          total_bytes = SSL_CLOSE_NOTIFY;
-          break;
+          TCP_SSL_DEBUG("tcp_ssl_read: connection closed\n");
         }
-      } else if (state & BR_SSL_SENDAPP) {
-        if (!tcp_ssl->handshake) {
-          tcp_ssl->handshake = 1;
-          READ_DEBUG("tcp_ssl_read: handshake successful\n");
-          if(tcp_ssl->on_handshake)
-            tcp_ssl->on_handshake(tcp_ssl->arg, tcp, tcp_ssl->ssl);
-        }
+        total_bytes = SSL_CLOSE_NOTIFY;
+        break;
       }
     }
   } while (pbuf_size > 0);
 
-  NET_DEBUG("tcp_ssl_read: acking %d / %d\n", pbuf_offset, p->tot_len);
-  tcp_recved(tcp, pbuf_offset);
-  //tcp_recved(tcp, p->tot_len);
+  NET_DEBUG("tcp_ssl_read: processed %d / %d\n", pbuf_offset, p->tot_len);
+  tcp_recved(tcp, p->tot_len);
   pbuf_free(p);
 
   return total_bytes;

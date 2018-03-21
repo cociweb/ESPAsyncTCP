@@ -459,10 +459,12 @@ err_t AsyncClient::_recv(tcp_pcb* pcb, pbuf* pb, err_t err) {
           // All data processed at TCP layer
           // Report normal read
           break;
+#if ASYNC_TCP_SSL_BEARSSL
         case SSL_CANNOT_READ:
           // SSL engine unable to take the data
           // Report out-of-memory
           return ERR_MEM;
+#endif
         default:
           // Unexpected error, abort connection
           _ssl_error(read_bytes);

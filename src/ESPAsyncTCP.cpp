@@ -62,6 +62,8 @@ AsyncClient::AsyncClient(tcp_pcb* pcb):
   , _handshake_start(0)
   , _handshake_timeout(ASYNC_MAX_HANDSHAKE_TIME)
 #if ASYNC_TCP_SSL_BEARSSL
+  , _ssl_certlookup_cb(0)
+  , _ssl_certlookup_cb_arg(0)
   , _ssl_in_buf_size(BEARSSL_DEFAULT_IN_BUF_SIZE)
   , _ssl_out_buf_size(BEARSSL_DEFAULT_OUT_BUF_SIZE)
 #endif
@@ -98,6 +100,7 @@ AsyncClient::AsyncClient(tcp_pcb* pcb):
       tcp_ssl_data(_pcb, &_s_data);
       tcp_ssl_handshake(_pcb, &_s_handshake);
       tcp_ssl_err(_pcb, &_s_ssl_error);
+      tcp_ssl_cert(_pcb, &_s_certlookup);
 
       _pcb_secure = true;
       _handshake_done = false;
@@ -187,6 +190,7 @@ AsyncClient& AsyncClient::operator=(const AsyncClient& other){
       tcp_ssl_data(_pcb, &_s_data);
       tcp_ssl_handshake(_pcb, &_s_handshake);
       tcp_ssl_err(_pcb, &_s_ssl_error);
+      tcp_ssl_cert(_pcb, &_s_certlookup);
     } else {
       _pcb_secure = false;
       _handshake_done = true;
@@ -337,6 +341,7 @@ err_t AsyncClient::_connected(void* pcb, err_t err){
       tcp_ssl_data(_pcb, &_s_data);
       tcp_ssl_handshake(_pcb, &_s_handshake);
       tcp_ssl_err(_pcb, &_s_ssl_error);
+      tcp_ssl_cert(_pcb, &_s_certlookup);
     }
   }
   if(!_pcb_secure && _connect_cb)
@@ -734,6 +739,22 @@ void AsyncClient::setInBufSize(int size) {
 void AsyncClient::setOutBufSize(int size) {
   _ssl_out_buf_size = size;
 }
+
+void AsyncClient::onSSLCertLookup(AcSSLCertLookupHandler cb, void* arg) {
+  _ssl_certlookup_cb = cb;
+  _ssl_certlookup_cb_arg = arg;
+}
+
+int AsyncClient::_s_certlookup(void *arg, struct tcp_pcb *tcp, void *dn_hash,
+  size_t dn_hash_len, uint8_t **buf){
+  return reinterpret_cast<AsyncClient*>(arg)->_ssl_certlookup(dn_hash, dn_hash_len, buf);
+}
+
+int AsyncClient::_ssl_certlookup(void *dn_hash, size_t dn_hash_len, uint8_t **buf) {
+  if (_ssl_certlookup_cb)
+    _ssl_certlookup_cb(_ssl_certlookup_cb_arg, this, dn_hash, dn_hash_len, buf);
+}
+
 #endif
 
 #endif

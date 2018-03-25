@@ -59,6 +59,14 @@ typedef std::function<void(void*, AsyncClient*, void *data, size_t len)> AcDataH
 typedef std::function<void(void*, AsyncClient*, struct pbuf *pb)> AcPacketHandler;
 typedef std::function<void(void*, AsyncClient*, uint32_t time)> AcTimeoutHandler;
 
+#if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_BEARSSL
+typedef std::function<int(void*, AsyncClient*, void *dn_hash, size_t dn_hash_len,
+    uint8_t **buf)> AcSSLCertLookupHandler;
+#endif
+#endif
+
+
 class AsyncClient {
   protected:
     friend class AsyncTCPbuffer;
@@ -87,6 +95,8 @@ class AsyncClient {
     uint32_t _handshake_start;
     uint32_t _handshake_timeout;
 #if ASYNC_TCP_SSL_BEARSSL
+    AcSSLCertLookupHandler _ssl_certlookup_cb;
+    void* _ssl_certlookup_cb_arg;
     int _ssl_in_buf_size;
     int _ssl_out_buf_size;
 #endif
@@ -108,6 +118,9 @@ class AsyncClient {
     void _error(err_t err);
 #if ASYNC_TCP_SSL_ENABLED
     void _ssl_error(err_t err);
+#if ASYNC_TCP_SSL_BEARSSL
+    int _ssl_certlookup(void *dn_hash, size_t dn_hash_len, uint8_t **buf);
+#endif
 #endif
     err_t _poll(tcp_pcb* pcb);
     err_t _sent(tcp_pcb* pcb, uint16_t len);
@@ -130,6 +143,10 @@ class AsyncClient {
     static void _s_data(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
     static void _s_handshake(void *arg, struct tcp_pcb *tcp, SSL *ssl);
     static void _s_ssl_error(void *arg, struct tcp_pcb *tcp, err_t err);
+#if ASYNC_TCP_SSL_BEARSSL
+    static int _s_certlookup(void *arg, struct tcp_pcb *tcp, void *dn_hash,
+        size_t dn_hash_len, uint8_t **buf);
+#endif
 #endif
 
   public:
@@ -214,7 +231,13 @@ class AsyncClient {
     void onData(AcDataHandler cb, void* arg = 0);           //data received (called if onPacket is not used)
     void onPacket(AcPacketHandler cb, void* arg = 0);       //data received
     void onTimeout(AcTimeoutHandler cb, void* arg = 0);     //ack timeout
-    void onPoll(AcConnectHandler cb, void* arg = 0);        //every 125ms when connected
+    void onPoll(AcConnectHandler cb, void* arg = 0);        //every 2*TCP_TMR_INTERVAL when connected
+
+#if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_BEARSSL
+    void onSSLCertLookup(AcSSLCertLookupHandler cb, void* arg = 0); //when ssl handshake need a trust anchor certificate
+#endif
+#endif
 
     void ackPacket(struct pbuf * pb);
 
@@ -226,7 +249,7 @@ class AsyncClient {
 
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_AXTLS
-typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> AcSSlFileHandler;
+typedef std::function<int(void* arg, const char *filename, uint8_t **buf)intcSSlFileHandler;
 #endif
 struct pending_pcb;
 #endif

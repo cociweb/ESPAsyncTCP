@@ -128,6 +128,7 @@ struct tcp_ssl_pcb {
   tcp_ssl_data_cb_t on_data;
   tcp_ssl_handshake_cb_t on_handshake;
   tcp_ssl_error_cb_t on_error;
+  tcp_ssl_cert_cb_t on_cert;
   struct tcp_ssl_pcb * next;
 };
 
@@ -285,14 +286,6 @@ static const br_hash_class *hashes[] = {
     &br_sha512_vtable
 };
 
-static tcp_ssl_cert_cb_t _tcp_ssl_cert_cb = NULL;
-static void * _tcp_ssl_cert_arg = NULL;
-
-void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg){
-    _tcp_ssl_cert_cb = cb;
-    _tcp_ssl_cert_arg = arg;
-}
-
 static br_x509_trust_anchor* ssl_new_ta(void) {
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(br_x509_trust_anchor) %d\n", sizeof(br_x509_trust_anchor));
@@ -321,11 +314,11 @@ static void freeHashedTA(void *ctx, const br_x509_trust_anchor *ta) {
 
 static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t dn_hash_len) {
     TA_DEBUG("findHashedTA: finding trusted certificate...\n");
+    struct tcp_pcb *tcp = (struct tcp_pcb *)ctx;
+    tcp_ssl_t * tcp_ssl = tcp_ssl_get(tcp);
     uint8_t *certbuf;
-    int certlen = 0;
-    if(_tcp_ssl_cert_cb) {
-        certlen = _tcp_ssl_cert_cb(_tcp_ssl_cert_arg, (struct tcp_pcb *)ctx, dn_hash, dn_hash_len, &certbuf);
-    }
+    int certlen = !tcp_ssl->on_cert ? 0
+        : tcp_ssl->on_cert(tcp_ssl->arg, tcp, dn_hash, dn_hash_len, &certbuf);
     if(certlen) {
         // Feed the dog before it bites
         system_soft_wdt_feed();
@@ -729,6 +722,10 @@ static void tcp_ssl_handshake_pump() {
                             TCP_SSL_DEBUG("error (%d)\n", ssl_error);
                         }
                     );
+                    if(tcp_ssl_hsptr->on_error) {
+                        tcp_ssl_hsptr->on_error(tcp_ssl_hsptr->arg,
+                            tcp_ssl_hsptr->tcp, ssl_error);
+                    }
                     tcp_abort(tcp_ssl_hsptr->tcp);
                 } else if(state & BR_SSL_SENDAPP) {
                     HS_DEBUG("tcp_ssl_handshake_pump: handshake successful\n");
@@ -915,6 +912,13 @@ void tcp_ssl_err(struct tcp_pcb *tcp, tcp_ssl_error_cb_t arg){
   tcp_ssl_t * item = tcp_ssl_get(tcp);
   if(item) {
     item->on_error = arg;
+  }
+}
+
+void tcp_ssl_cert(struct tcp_pcb *tcp, tcp_ssl_cert_cb_t arg){
+  tcp_ssl_t * item = tcp_ssl_get(tcp);
+  if(item) {
+    item->on_cert = arg;
   }
 }
 

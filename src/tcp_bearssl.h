@@ -53,7 +53,7 @@ extern "C" {
 #define ERR_TCP_SSL_OUTOFMEMORY           -107
 #define SSL_CLOSE_NOTIFY                  -200
 #define SSL_CANNOT_READ                   -201
-    
+
 #define TCP_SSL_TYPE_CLIENT_ALL           0x0F
 #define TCP_SSL_TYPE_CLIENT_CONNECTED     0x01
 #define TCP_SSL_TYPE_CLIENT_HANDSHAKED    0x02
@@ -79,12 +79,10 @@ typedef struct SSL_CTX_ SSL_CTX;
 typedef void (* tcp_ssl_data_cb_t)(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
 typedef void (* tcp_ssl_handshake_cb_t)(void *arg, struct tcp_pcb *tcp, SSL *ssl);
 typedef void (* tcp_ssl_error_cb_t)(void *arg, struct tcp_pcb *tcp, err_t error);
+typedef int (* tcp_ssl_cert_cb_t)(void *arg, struct tcp_pcb *tcp, void *dn_hash,
+  size_t dn_hash_len, uint8_t **buf);
 
 uint8_t tcp_ssl_has_client();
-
-typedef int (* tcp_ssl_cert_cb_t)(void *arg, struct tcp_pcb *tcp, void *dn_hash, size_t dn_hash_len, uint8_t **buf);
-
-void tcp_ssl_cert(tcp_ssl_cert_cb_t cb, void * arg);
 
 #define SSL_BUF_OVERHEAD            325
 #define SSL_BUF_MINIMUM_DATALEN     512
@@ -120,6 +118,7 @@ void tcp_ssl_arg(struct tcp_pcb *tcp, void * arg);
 void tcp_ssl_data(struct tcp_pcb *tcp, tcp_ssl_data_cb_t arg);
 void tcp_ssl_handshake(struct tcp_pcb *tcp, tcp_ssl_handshake_cb_t arg);
 void tcp_ssl_err(struct tcp_pcb *tcp, tcp_ssl_error_cb_t arg);
+void tcp_ssl_cert(struct tcp_pcb *tcp, tcp_ssl_cert_cb_t arg);
 
 SSL * tcp_ssl_get_ssl(struct tcp_pcb *tcp);
 void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx);

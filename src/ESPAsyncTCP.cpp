@@ -32,6 +32,10 @@ extern "C"{
 #include <tcp_axtls.h>
 #include <tcp_bearssl.h>
 
+#if ASYNC_TCP_SSL_BEARSSL
+#include "brssl.h"
+#endif
+
 /*
   Async TCP Client
 */
@@ -213,7 +217,8 @@ int8_t AsyncClient::abort(){
 }
 
 void AsyncClient::close(bool now){
-  tcp_recved(_pcb, _rx_ack_len);
+  if (_pcb)
+    tcp_recved(_pcb, _rx_ack_len);
   if(now)
     _close();
   else
@@ -400,8 +405,21 @@ void AsyncClient::_error(err_t err) {
 
 #if ASYNC_TCP_SSL_ENABLED
 void AsyncClient::_ssl_error(err_t err){
+#if ASYNC_TCP_SSL_BEARSSL
+  ASYNC_TCP_DEBUG_DO({
+    const char *desc;
+    if (find_error_name(err, &desc)) {
+      ASYNC_TCP_DEBUG("SSL error - %s\n", String(FPSTR(desc)).c_str());
+    } else {
+      ASYNC_TCP_DEBUG("SSL error (%d)\n", err);
+    }
+  });
+#else
   ASYNC_TCP_DEBUG("SSL error: %d\n", err);
+#endif
   if(_error_cb) {
+    if(!_handshake_done)
+      _error_cb(_error_cb_arg, this, -56);
     _error_cb(_error_cb_arg, this, err);
   }
 }
@@ -751,8 +769,10 @@ int AsyncClient::_s_certlookup(void *arg, struct tcp_pcb *tcp, void *dn_hash,
 }
 
 int AsyncClient::_ssl_certlookup(void *dn_hash, size_t dn_hash_len, uint8_t **buf) {
-  if (_ssl_certlookup_cb)
-    _ssl_certlookup_cb(_ssl_certlookup_cb_arg, this, dn_hash, dn_hash_len, buf);
+  if (_ssl_certlookup_cb) {
+    return _ssl_certlookup_cb(_ssl_certlookup_cb_arg, this, dn_hash, dn_hash_len, buf);
+  }
+  return 0;
 }
 
 #endif
@@ -878,46 +898,49 @@ void AsyncClient::ackPacket(struct pbuf * pb){
   pbuf_free(pb);
 }
 
-const char * AsyncClient::errorToString(int8_t error){
+PGM_P AsyncClient::errorToString(int8_t error){
   switch(error){
-    case ERR_OK: return "OK";
-    case ERR_MEM: return "Out of memory error";
-    case ERR_BUF: return "Buffer error";
-    case ERR_TIMEOUT: return "Timeout";
-    case ERR_RTE: return "Routing problem";
-    case ERR_INPROGRESS: return "Operation in progress";
-    case ERR_VAL: return "Illegal value";
-    case ERR_WOULDBLOCK: return "Operation would block";
-    case ERR_ABRT: return "Connection aborted";
-    case ERR_RST: return "Connection reset";
-    case ERR_CLSD: return "Connection closed";
-    case ERR_CONN: return "Not connected";
-    case ERR_ARG: return "Illegal argument";
-    case ERR_USE: return "Address in use";
-    case ERR_IF: return "Low-level netif error";
+    case ERR_OK: return PSTR("OK");
+    case ERR_MEM: return PSTR("Out of memory error");
+    case ERR_BUF: return PSTR("Buffer error");
+    case ERR_TIMEOUT: return PSTR("Timeout");
+    case ERR_RTE: return PSTR("Routing problem");
+    case ERR_INPROGRESS: return PSTR("Operation in progress");
+    case ERR_VAL: return PSTR("Illegal value");
+    case ERR_WOULDBLOCK: return PSTR("Operation would block");
+    case ERR_ABRT: return PSTR("Connection aborted");
+    case ERR_RST: return PSTR("Connection reset");
+    case ERR_CLSD: return PSTR("Connection closed");
+    case ERR_CONN: return PSTR("Not connected");
+    case ERR_ARG: return PSTR("Illegal argument");
+    case ERR_USE: return PSTR("Address in use");
+    case ERR_IF: return PSTR("Low-level netif error");
 #if LWIP_VERSION_MAJOR > 1
-    case ERR_ALREADY: return "Connect in progress";
+    case ERR_ALREADY: return PSTR("Connect in progress");
 #endif
-    case ERR_ISCONN: return "Already connected";
-    case -55: return "DNS failed";
-    default: return "UNKNOWN";
+    case ERR_ISCONN: return PSTR("Already connected");
+    case -55: return PSTR("DNS failed");
+#if ASYNC_TCP_SSL_ENABLED
+    case -56: return PSTR("SSL handshake failed");
+#endif
+    default: return PSTR("UNKNOWN");
   }
 }
 
-const char * AsyncClient::stateToString(){
+PGM_P AsyncClient::stateToString(){
   switch(state()){
-    case tcp_state::CLOSED: return "Closed";
-    case tcp_state::LISTEN: return "Listen";
-    case tcp_state::SYN_SENT: return "SYN Sent";
-    case tcp_state::SYN_RCVD: return "SYN Received";
-    case tcp_state::ESTABLISHED: return "Established";
-    case tcp_state::FIN_WAIT_1: return "FIN Wait 1";
-    case tcp_state::FIN_WAIT_2: return "FIN Wait 2";
-    case tcp_state::CLOSE_WAIT: return "Close Wait";
-    case tcp_state::CLOSING: return "Closing";
-    case tcp_state::LAST_ACK: return "Last ACK";
-    case tcp_state::TIME_WAIT: return "Time Wait";
-    default: return "UNKNOWN";
+    case tcp_state::CLOSED: return PSTR("Closed");
+    case tcp_state::LISTEN: return PSTR("Listen");
+    case tcp_state::SYN_SENT: return PSTR("SYN Sent");
+    case tcp_state::SYN_RCVD: return PSTR("SYN Received");
+    case tcp_state::ESTABLISHED: return PSTR("Established");
+    case tcp_state::FIN_WAIT_1: return PSTR("FIN Wait 1");
+    case tcp_state::FIN_WAIT_2: return PSTR("FIN Wait 2");
+    case tcp_state::CLOSE_WAIT: return PSTR("Close Wait");
+    case tcp_state::CLOSING: return PSTR("Closing");
+    case tcp_state::LAST_ACK: return PSTR("Last ACK");
+    case tcp_state::TIME_WAIT: return PSTR("Time Wait");
+    default: return PSTR("UNKNOWN");
   }
 }
 

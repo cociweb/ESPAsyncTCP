@@ -38,7 +38,6 @@
 #include <stdarg.h>
 
 #include <tcp_bearssl.h>
-#include "brssl.h"
 
 #define BEARSSL_ALTSTACK 0
 
@@ -317,8 +316,12 @@ static const br_x509_trust_anchor *findHashedTA(void *ctx, void *dn_hash, size_t
     struct tcp_pcb *tcp = (struct tcp_pcb *)ctx;
     tcp_ssl_t * tcp_ssl = tcp_ssl_get(tcp);
     uint8_t *certbuf;
-    int certlen = !tcp_ssl->on_cert ? 0
-        : tcp_ssl->on_cert(tcp_ssl->arg, tcp, dn_hash, dn_hash_len, &certbuf);
+    int certlen = 0;
+    if(tcp_ssl->on_cert) {
+        certlen = tcp_ssl->on_cert(tcp_ssl->arg, tcp, dn_hash, dn_hash_len, &certbuf);
+    } else {
+        TCP_SSL_DEBUG("findHashedTA: no cert lookup handler installed\n");
+    }
     if(certlen) {
         // Feed the dog before it bites
         system_soft_wdt_feed();
@@ -711,17 +714,9 @@ static void tcp_ssl_handshake_pump() {
 
                 state = br_ssl_engine_current_state(engine);
                 if(state & BR_SSL_CLOSED) {
-                    TCP_SSL_DEBUG("tcp_ssl_handshake_pump: handshake failed - ");
                     int ssl_error = br_ssl_engine_last_error(engine);
-                    TCP_SSL_DEBUG_DO(
-                        const char *desc;
-                        if(find_error_name(ssl_error, &desc)) {
-                            ets_puts_P(desc);
-                            ets_putc('\n');
-                        } else {
-                            TCP_SSL_DEBUG("error (%d)\n", ssl_error);
-                        }
-                    );
+                    TCP_SSL_DEBUG("tcp_ssl_handshake_pump: handshake failed (%d)\n",
+                        ssl_error);
                     if(tcp_ssl_hsptr->on_error) {
                         tcp_ssl_hsptr->on_error(tcp_ssl_hsptr->arg,
                             tcp_ssl_hsptr->tcp, ssl_error);

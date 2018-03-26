@@ -26,7 +26,8 @@
 #include "IPAddress.h"
 #include <functional>
 #include <WString.h>
-
+#include <pgmspace.h>
+	
 extern "C" {
     #include "lwip/init.h"
     #include "lwip/err.h"
@@ -241,8 +242,8 @@ class AsyncClient {
 
     void ackPacket(struct pbuf * pb);
 
-    static const char * errorToString(int8_t error);
-    const char * stateToString();
+    static PGM_P errorToString(int8_t error);
+    PGM_P stateToString();
 
     err_t _recv(tcp_pcb* pcb, pbuf* pb, err_t err);
 };

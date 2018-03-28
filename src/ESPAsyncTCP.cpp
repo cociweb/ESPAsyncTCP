@@ -565,12 +565,13 @@ err_t AsyncClient::_poll(tcp_pcb* pcb){
 #if ASYNC_TCP_SSL_BEARSSL
     int pumped = tcp_ssl_outbuf_pump(pcb);
     if(pumped) {
+      ASYNC_TCP_DEBUG("_poll: ssl pumped %d\n", pumped);
       if(_handshake_done) {
         _pcb_busy = true;
         _pcb_sent_at = now;
         _tx_unacked_len+= pumped;
       }
-      return ERR_OK;
+      //return ERR_OK;
     }
 #endif
   }
@@ -1110,7 +1111,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
     else
       tcp_nagle_enable(pcb);
 
-
+    AsyncClient *c;
 #if ASYNC_TCP_SSL_ENABLED
     if(_ssl_ctx){
       if(tcp_ssl_has_client() || _pending){
@@ -1140,7 +1141,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
           p->next = new_item;
         }
       } else {
-        AsyncClient *c = new AsyncClient(pcb, _ssl_ctx);
+        c = new AsyncClient(pcb, _ssl_ctx);
         if(c){
             c->onConnect([this](void * arg, AsyncClient *c){
               _connect_cb(_connect_cb_arg, c);
@@ -1149,17 +1150,15 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
       }
       return ERR_OK;
     } else {
-      AsyncClient *c = new AsyncClient(pcb, NULL);
-#else
-      AsyncClient *c = new AsyncClient(pcb);
-#endif
-      if(c){
-        _connect_cb(_connect_cb_arg, c);
-        return ERR_OK;
-      }
-#if ASYNC_TCP_SSL_ENABLED
+      c = new AsyncClient(pcb, NULL);
     }
+#else
+    c = new AsyncClient(pcb);
 #endif
+    if(c){
+      _connect_cb(_connect_cb_arg, c);
+      return ERR_OK;
+    }
   }
   if(tcp_close(pcb) != ERR_OK){
     tcp_abort(pcb);
@@ -1179,7 +1178,7 @@ err_t AsyncServer::_poll(tcp_pcb* pcb){
       _pending = _pending->next;
     } else {
       while(p->next && p->next->pcb != pcb) p = p->next;
-      if(!p->next) return 0;
+      if(!p->next) return ERR_OK;
       struct pending_pcb * b = p->next;
       p->next = b->next;
       p = b;

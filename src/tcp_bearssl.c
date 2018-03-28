@@ -673,15 +673,15 @@ static bool tcp_ssl_handshake_consume(struct tcp_ssl_pcb *tcp_ssl, int amount) {
         if (!tcp_ssl->handshake) {
             if (offset_new) {
                 // Should not reach!
-                HS_DEBUG("tcp_ssl_handshake_consume: "
-                    "over-consumed by %d\n", offset_new);
+                HS_DEBUG("tcp_ssl_handshake_consume: over-consumed by %d\n",
+                    offset_new);
             }
             tcp_ssl->handshake_offset = 0;
         } else {
             pbuf_ref(tcp_ssl->handshake);
         }
-        HS_DEBUG("tcp_ssl_handshake_consume: "
-            "discarding pbuf of %d\n", head_len);
+        HS_DEBUG("tcp_ssl_handshake_consume: discarding pbuf of %d\n",
+            head_len);
         pbuf_free(head);
     }
     return pbuf_handshake != tcp_ssl->handshake;

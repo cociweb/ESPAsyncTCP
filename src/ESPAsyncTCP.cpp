@@ -291,8 +291,9 @@ bool AsyncClient::send(){
       _tx_unacked_len += pumped;
     }
     return pumped;
-#endif
+#else
     return true;
+#endif
   }
 #endif
   err_t err = tcp_output(_pcb);

@@ -39,8 +39,6 @@
 
 #include <tcp_bearssl.h>
 
-#define BEARSSL_ALTSTACK 0
-
 #ifndef BEARSSL_HEAPDEBUG
 #define BEARSSL_HEAPDEBUG   0
 #endif
@@ -144,11 +142,6 @@ uint8_t tcp_ssl_has_client(){
   return _tcp_ssl_has_client;
 }
 
-#if BEARSSL_ALTSTACK
-#define BEARSSL_STACKSIZE 4500
-uint8_t* _bearssl_stack = NULL;
-#endif
-
 tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
   TCP_SSL_DEBUG("BearSSL %s\n", "(version)");
   HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
@@ -165,18 +158,6 @@ tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
   if(tcp_ssl_array){
     new_item->next = tcp_ssl_array;
   } else {
-#if BEARSSL_ALTSTACK
-    HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
-    HEAP_DEBUG("malloc(Alt-stack) %d\n", BEARSSL_STACKSIZE);
-    _bearssl_stack = (uint8_t*)malloc(BEARSSL_STACKSIZE);
-    if(_bearssl_stack) {
-      br_esp8266_stack_proxy_init(_bearssl_stack, BEARSSL_STACKSIZE);
-    } else {
-      TCP_SSL_DEBUG("tcp_ssl_new: failed to allocate bearssl alt-stack\n");
-      free(new_item);
-      return NULL;
-    }
-#endif
     os_timer_setfn(&handshake_timer, tcp_ssl_handshake_pump, NULL);
     os_timer_arm(&handshake_timer, HANDSHAKE_RES, true);
   }
@@ -595,10 +576,6 @@ int tcp_ssl_free(struct tcp_pcb *tcp) {
   free(cur);
 
   if(!tcp_ssl_array) {
-#if BEARSSL_ALTSTACK
-    free(_bearssl_stack);
-    _bearssl_stack = NULL;
-#endif
     os_timer_disarm(&handshake_timer);
   }
   return 0;

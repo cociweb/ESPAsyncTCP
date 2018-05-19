@@ -6,7 +6,7 @@
 #endif
 
 #ifndef ASYNC_TCP_SSL_BEARSSL
-#define ASYNC_TCP_SSL_BEARSSL 0
+#define ASYNC_TCP_SSL_BEARSSL 1
 #endif
 
 #ifndef ASYNC_TCP_SSL_AXTLS

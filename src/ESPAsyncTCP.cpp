@@ -214,7 +214,7 @@ int8_t AsyncClient::abort(){
 }
 
 void AsyncClient::close(bool now){
-  if (_pcb)
+  if(_pcb)
     tcp_recved(_pcb, _rx_ack_len);
   if(now)
     _close();
@@ -422,6 +422,10 @@ uint32_t AsyncClient::getHandshakeTimeout(){
 #endif
 
 err_t AsyncClient::_sent(tcp_pcb* pcb, uint16_t len) {
+#if ASYNC_TCP_SSL_ENABLED
+  if (_pcb_secure && !_handshake_done)
+    return ERR_OK;
+#endif
   _rx_last_packet = millis();
 
 #if ASYNC_TCP_SSL_ENABLED
@@ -481,6 +485,7 @@ err_t AsyncClient::_recv(tcp_pcb* pcb, pbuf* pb, err_t err) {
           tcp_abort(pcb);
           return ERR_ABRT;
       }
+      //return read_bytes;
     }
     return ERR_OK;
   }
@@ -892,33 +897,43 @@ void AsyncClient::ackPacket(struct pbuf * pb){
   pbuf_free(pb);
 }
 
-PGM_P AsyncClient::errorToString(int8_t error){
-  switch(error){
-    case ERR_OK: return PSTR("OK");
-    case ERR_MEM: return PSTR("Out of memory error");
-    case ERR_BUF: return PSTR("Buffer error");
-    case ERR_TIMEOUT: return PSTR("Timeout");
-    case ERR_RTE: return PSTR("Routing problem");
-    case ERR_INPROGRESS: return PSTR("Operation in progress");
-    case ERR_VAL: return PSTR("Illegal value");
-    case ERR_WOULDBLOCK: return PSTR("Operation would block");
-    case ERR_ABRT: return PSTR("Connection aborted");
-    case ERR_RST: return PSTR("Connection reset");
-    case ERR_CLSD: return PSTR("Connection closed");
-    case ERR_CONN: return PSTR("Not connected");
-    case ERR_ARG: return PSTR("Illegal argument");
-    case ERR_USE: return PSTR("Address in use");
-    case ERR_IF: return PSTR("Low-level netif error");
-#if LWIP_VERSION_MAJOR > 1
-    case ERR_ALREADY: return PSTR("Connect in progress");
-#endif
-    case ERR_ISCONN: return PSTR("Already connected");
-    case -55: return PSTR("DNS failed");
-#if ASYNC_TCP_SSL_ENABLED
-    case -56: return PSTR("SSL handshake failed");
-#endif
-    default: return PSTR("UNKNOWN");
-  }
+const char * AsyncClient::errorToString(int8_t error) {
+    switch (error) {
+    case ERR_OK: 
+		return "OK";
+    case ERR_MEM: 
+		return "Out of memory error";
+    case ERR_BUF: 
+		return "Buffer error";
+    case ERR_TIMEOUT: 
+		return "Timeout";
+    case ERR_RTE: 
+		return "Routing problem";
+    case ERR_INPROGRESS: 
+		return "Operation in progress";
+    case ERR_VAL: 
+		return "Illegal value";
+    case ERR_WOULDBLOCK: 
+		return "Operation would block";
+    case ERR_ABRT:
+		return "Connection aborted";
+    case ERR_RST: 
+		return "Connection reset";
+    case ERR_CLSD: 
+		return "Connection closed";
+    case ERR_CONN: 
+		return "Not connected";
+    case ERR_ARG: 
+		return "Illegal argument";
+    case ERR_USE: 
+		return "Address in use";
+    case ERR_IF: 
+		return "Low-level netif error";
+    case ERR_ISCONN: 
+		return "Connection already established";
+    default: 
+		return "Unknown error";
+    }
 }
 
 PGM_P AsyncClient::stateToString(){

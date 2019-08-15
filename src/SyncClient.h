@@ -23,6 +23,7 @@
 #define SYNCCLIENT_H_
 
 #include "Client.h"
+#include "tcp_bearssl_helpers.h"
 #include <async_config.h>
 class cbuf;
 class AsyncClient;
@@ -42,6 +43,10 @@ class SyncClient: public Client {
     void _attachCallbacks_Disconnect();
     void _attachCallbacks_AfterConnected();
 
+#if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
+    SSL_CTX_PARAMS _ssl_params;
+#endif
+
   public:
     SyncClient(size_t txBufLen = 1460);
     SyncClient(AsyncClient *client, size_t txBufLen = 1460);
@@ -59,6 +64,11 @@ class SyncClient: public Client {
     int connect(const char *host, uint16_t port){
       return connect(host, port, false);
     }
+#if ASYNC_TCP_SSL_BEARSSL
+    void setSSLParams(SSL_CTX_PARAMS& params) {
+        _ssl_params = params;
+    }
+#endif
 #else
     int connect(IPAddress ip, uint16_t port);
     int connect(const char *host, uint16_t port);

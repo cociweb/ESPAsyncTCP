@@ -29,12 +29,9 @@ extern "C"{
   #include "lwip/dns.h"
   #include "lwip/init.h"
 }
-#include <tcp_axtls.h>
-#include <tcp_bearssl.h>
-
-#if ASYNC_TCP_SSL_BEARSSL
-#include "brssl.h"
-#endif
+#include "tcp_axtls.h"
+#include "tcp_bearssl.h"
+#include "tcp_bearssl_helpers.h"
 
 /*
   Async TCP Client
@@ -304,7 +301,7 @@ bool AsyncClient::send(){
     _tx_unsent_len = 0;
     return true;
   }
-  ASYNC_TCP_DEBUG("send: tcp_output error %d\n", err);
+  ASYNC_TCP_DEBUG("send: tcp_output error %u\n", err);
   //_tx_unsent_len = 0;
   return false;
 }
@@ -335,7 +332,7 @@ err_t AsyncClient::_connected(void* pcb, err_t err){
 #if ASYNC_TCP_SSL_ENABLED
     if(_pcb_secure){
 #if ASYNC_TCP_SSL_BEARSSL
-      if(tcp_ssl_new_client_ex(_pcb, _hostname.c_str(), _ssl_in_buf_size, _ssl_out_buf_size) < 0){
+      if(tcp_ssl_new_client_ex(_pcb, _hostname.c_str(), _ssl_params)){
 #endif
 #if ASYNC_TCP_SSL_AXTLS
       if(tcp_ssl_new_client(_pcb) < 0){
@@ -406,18 +403,7 @@ void AsyncClient::_error(err_t err) {
 
 #if ASYNC_TCP_SSL_ENABLED
 void AsyncClient::_ssl_error(err_t err){
-#if ASYNC_TCP_SSL_BEARSSL
-  ASYNC_TCP_DEBUG_DO({
-    const char *desc;
-    if (find_error_name(err, &desc)) {
-      ASYNC_TCP_DEBUG("SSL error - %s\n", String(FPSTR(desc)).c_str());
-    } else {
-      ASYNC_TCP_DEBUG("SSL error (%d)\n", err);
-    }
-  });
-#else
-  ASYNC_TCP_DEBUG("SSL error: %d\n", err);
-#endif
+  ASYNC_TCP_DEBUG("SSL error (%u)\n", err); // TODO: BR_ERR_... for BearSSL
   if(_error_cb) {
     if(!_handshake_done)
       _error_cb(_error_cb_arg, this, -56);
@@ -753,16 +739,22 @@ SSL * AsyncClient::getSSL(){
 
 #if ASYNC_TCP_SSL_BEARSSL
 void AsyncClient::setInBufSize(int size) {
-  _ssl_in_buf_size = size;
+  _ssl_params.iobuf_in_size = size;
 }
 
 void AsyncClient::setOutBufSize(int size) {
-  _ssl_out_buf_size = size;
+  _ssl_params.iobuf_out_size = size;
 }
 
 void AsyncClient::onSSLCertLookup(AcSSLCertLookupHandler cb, void* arg) {
   _ssl_certlookup_cb = cb;
   _ssl_certlookup_cb_arg = arg;
+}
+
+void AsyncClient::setSSLParams(SSL_CTX_PARAMS& params) {
+  params.display("setSSLParams orig", Serial);
+  _ssl_params = params;
+  _ssl_params.display("_ssl_params", Serial);
 }
 
 int AsyncClient::_s_certlookup(void *arg, struct tcp_pcb *tcp, void *dn_hash,

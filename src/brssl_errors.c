@@ -22,14 +22,14 @@
  * SOFTWARE.
  */
 
-#include "pgmspace.h"
+#include <pgmspace.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>
 
-#include "brssl.h"
+#include "bearssl/bearssl.h"
 
 static const char _NAME_BR_ERR_BAD_PARAM[] PROGMEM = "BR_ERR_BAD_PARAM";
 static const char _DESC_BR_ERR_BAD_PARAM[] PROGMEM = "Caller-provided parameter is incorrect.";

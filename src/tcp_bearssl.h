@@ -28,21 +28,23 @@
 #define ASYNCTCP_SSL_BEARSSL_H
 
 #include <async_config.h>
+#include <memory>
 
 #if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
 
-#include "lwipopts.h"
-/*
- * All those functions will run only if LWIP tcp raw mode is used
- */
-#if LWIP_RAW==1
+#include "tcp_bearssl_helpers.h"
+#include <BearSSLHelpers.h>
 
-#ifdef __cplusplus
-extern "C" {
+#if BEARSSL_DEBUG
+#define DEBUG_BSSL(...) TCP_SSL_DEBUG(__VA_ARGS__)
+#else
+#define DEBUG_BSSL(...)
 #endif
 
+#include "lwipopts.h"
+
 #include <stdbool.h>
-#include "include/bearssl.h"
+#include <bearssl/bearssl.h>
 
 #define ERR_TCP_SSL_INVALID_TCP           -101
 #define ERR_TCP_SSL_INVALID_TCP_DATA      -102
@@ -59,22 +61,49 @@ extern "C" {
 #define TCP_SSL_TYPE_CLIENT_HANDSHAKED    0x02
 #define TCP_SSL_TYPE_SERVER_ALL           0xF0
 
-struct SSL_ {
+// XXX: this is a dumb c/p from WiFiClientSecure **cpp**
+extern "C" {
+    // Private x509 decoder state
+    struct br_x509_insecure_context {
+        const br_x509_class *vtable;
+        bool done_cert;
+        const uint8_t *match_fingerprint;
+        br_sha1_context sha1_cert;
+        bool allow_self_signed;
+        br_sha256_context sha256_subject;
+        br_sha256_context sha256_issuer;
+        br_x509_decoder_context ctx;
+    };
+    void br_x509_insecure_init(br_x509_insecure_context *ctx, int _use_fingerprint, const uint8_t _fingerprint[20], int _allow_self_signed);
+};
+
+typedef struct SSL_ {
   br_ssl_client_context* _cc;
   br_ssl_server_context* _sc;
-};
-typedef struct SSL_ SSL;
+} SSL;
 
-struct SSL_CTX_ {
+typedef struct SSL_CTX_ {
   br_ssl_engine_context *_eng;
-  br_x509_minimal_context _x509_minimal;
-  unsigned char* _iobuf_in;
-  unsigned char* _iobuf_out;
+
+  std::shared_ptr<br_x509_minimal_context> _x509_minimal;
+  std::shared_ptr<struct br_x509_insecure_context> _x509_insecure;
+  std::shared_ptr<br_x509_knownkey_context> _x509_knownkey;
+  std::shared_ptr<unsigned char> _iobuf_in;
+  std::shared_ptr<unsigned char> _iobuf_out;
+
+  std::shared_ptr<uint16_t> _cipher_list;
+
+  time_t _now;
+  const BearSSL::X509List *_ta;
   int _iobuf_in_size;
   int _iobuf_out_size;
   int _pending_send;
-};
-typedef struct SSL_CTX_ SSL_CTX;
+
+  bool _use_insecure;
+  bool _use_fingerprint;
+  uint8_t _fingerprint[20];
+  bool _use_self_signed;
+} SSL_CTX;
 
 typedef void (* tcp_ssl_data_cb_t)(void *arg, struct tcp_pcb *tcp, uint8_t * data, size_t len);
 typedef void (* tcp_ssl_handshake_cb_t)(void *arg, struct tcp_pcb *tcp, SSL *ssl);
@@ -102,7 +131,7 @@ uint8_t tcp_ssl_has_client();
 #define BEARSSL_DEFAULT_OUT_BUF_SIZE    SSL_MINIMUM_BUF_SIZE
 
 int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName);
-int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf_size, int _out_buf_size);
+int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, SSL_CTX_PARAMS& params);
 
 SSL_CTX * tcp_ssl_new_server_ctx(const char *cert, const char *private_key_file, const char *password);
 int tcp_ssl_new_server(struct tcp_pcb *tcp, SSL_CTX* ssl_ctx);
@@ -123,12 +152,6 @@ void tcp_ssl_cert(struct tcp_pcb *tcp, tcp_ssl_cert_cb_t arg);
 SSL * tcp_ssl_get_ssl(struct tcp_pcb *tcp);
 void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx);
 bool tcp_ssl_has(struct tcp_pcb *tcp);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* LWIP_RAW==1 */
 
 #endif /* ASYNC_TCP_SSL_ENABLED */
 

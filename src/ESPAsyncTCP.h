@@ -22,8 +22,9 @@
 #ifndef ASYNCTCP_H_
 #define ASYNCTCP_H_
 
+#include <Arduino.h>
 #include <async_config.h>
-#include "IPAddress.h"
+#include <IPAddress.h>
 #include <functional>
 #include <WString.h>
 #include <pgmspace.h>
@@ -51,6 +52,7 @@ struct SSL_;
 typedef struct SSL_ SSL;
 struct SSL_CTX_;
 typedef struct SSL_CTX_ SSL_CTX;
+
 #endif
 
 typedef std::function<void(void*, AsyncClient*)> AcConnectHandler;
@@ -62,6 +64,7 @@ typedef std::function<void(void*, AsyncClient*, uint32_t time)> AcTimeoutHandler
 
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_BEARSSL
+#include "tcp_bearssl_helpers.h"
 typedef std::function<int(void*, AsyncClient*, void *dn_hash, size_t dn_hash_len,
     uint8_t **buf)> AcSSLCertLookupHandler;
 #endif
@@ -147,6 +150,7 @@ class AsyncClient {
 #if ASYNC_TCP_SSL_BEARSSL
     static int _s_certlookup(void *arg, struct tcp_pcb *tcp, void *dn_hash,
         size_t dn_hash_len, uint8_t **buf);
+    SSL_CTX_PARAMS _ssl_params;
 #endif
 #endif
 
@@ -237,6 +241,8 @@ class AsyncClient {
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_BEARSSL
     void onSSLCertLookup(AcSSLCertLookupHandler cb, void* arg = 0); //when ssl handshake need a trust anchor certificate
+
+    void setSSLParams(SSL_CTX_PARAMS& params);
 #endif
 #endif
 

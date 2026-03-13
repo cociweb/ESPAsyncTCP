@@ -26,14 +26,10 @@
 #include <async_config.h>
 #include <IPAddress.h>
 #include <functional>
-<<<<<<< HEAD
 #include <memory>
-
-=======
 #include <WString.h>
 #include <pgmspace.h>
-	
->>>>>>> mcspr/bearssl
+
 extern "C" {
     #include "lwip/init.h"
     #include "lwip/err.h"
@@ -296,14 +292,7 @@ class AsyncClient {
     void onData(AcDataHandler cb, void* arg = 0);           //data received (called if onPacket is not used)
     void onPacket(AcPacketHandler cb, void* arg = 0);       //data received
     void onTimeout(AcTimeoutHandler cb, void* arg = 0);     //ack timeout
-<<<<<<< HEAD
-    void onPoll(AcConnectHandler cb, void* arg = 0);        //every 125ms when connected
-    void ackPacket(struct pbuf * pb);
-
-    const char * errorToString(err_t error);
-    const char * stateToString();
-=======
-    void onPoll(AcConnectHandler cb, void* arg = 0);        //every 2*TCP_TMR_INTERVAL when connected
+void onPoll(AcConnectHandler cb, void* arg = 0);        //every 2*TCP_TMR_INTERVAL when connected
 
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_BEARSSL
@@ -317,7 +306,6 @@ class AsyncClient {
 
     static PGM_P errorToString(int8_t error);
     PGM_P stateToString();
->>>>>>> mcspr/bearssl
 
     void _recv(std::shared_ptr<ACErrorTracker>& closeAbort, tcp_pcb* pcb, pbuf* pb, err_t err);
     err_t getCloseError(void) const { return _errorTracker->getCloseError();}
@@ -346,11 +334,8 @@ class AsyncServer {
     AcSSlFileHandler _file_cb;
     void* _file_cb_arg;
 #endif
-<<<<<<< HEAD
 #ifdef DEBUG_MORE
     int _event_count[EE_MAX];
-=======
->>>>>>> mcspr/bearssl
 #endif
 
   public:

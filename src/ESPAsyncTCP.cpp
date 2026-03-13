@@ -289,11 +289,7 @@ bool AsyncClient::connect(const char* host, uint16_t port){
   err_t err = dns_gethostbyname(host, addr, (dns_found_callback)&_s_dns_found, this);
   if(err == ERR_OK) {
 #if ASYNC_TCP_SSL_ENABLED
-<<<<<<< HEAD
-    return connect(addr, port, secure);
-=======
     return connect(IPAddress(addr.addr), port, secure, host);
->>>>>>> mcspr/bearssl
 #else
     return connect(addr, port);
 #endif
@@ -309,12 +305,7 @@ bool AsyncClient::connect(const char* host, uint16_t port){
 }
 
 AsyncClient& AsyncClient::operator=(const AsyncClient& other){
-<<<<<<< HEAD
-  if (_pcb) {
-    ASYNC_TCP_DEBUG("operator=[%u]: Abandoned _pcb(0x%" PRIXPTR ") forced close.\n", getConnectionId(), uintptr_t(_pcb));
-=======
   if(_pcb)
->>>>>>> mcspr/bearssl
     _close();
   }
   _errorTracker = other._errorTracker;
@@ -404,15 +395,9 @@ size_t AsyncClient::write(const char* data) {
 
 size_t AsyncClient::write(const char* data, size_t size, uint8_t apiflags) {
   size_t will_send = add(data, size, apiflags);
-<<<<<<< HEAD
-
-  if(!will_send || !send())
-    return 0;
-=======
   if(will_send > 0) {
     if(!send()) return 0;
   }
->>>>>>> mcspr/bearssl
   return will_send;
 }
 
@@ -461,24 +446,16 @@ bool AsyncClient::send(){
 #else
     return true;
 #endif
-<<<<<<< HEAD
-=======
   }
 #endif
->>>>>>> mcspr/bearssl
   err_t err = tcp_output(_pcb);
   if(err == ERR_OK){
     _pcb_busy = true;
     _pcb_sent_at = millis();
     return true;
   }
-<<<<<<< HEAD
-
-  ASYNC_TCP_DEBUG("send[%u]: tcp_output() returned err: %s(%ld)", getConnectionId(), errorToString(err), err);
-=======
   ASYNC_TCP_DEBUG("send: tcp_output error %u\n", err);
   //_tx_unsent_len = 0;
->>>>>>> mcspr/bearssl
   return false;
 }
 
@@ -530,13 +507,8 @@ void AsyncClient::_connected(std::shared_ptr<ACErrorTracker>& errorTracker, void
 #endif
 #if ASYNC_TCP_SSL_AXTLS
       if(tcp_ssl_new_client(_pcb) < 0){
-<<<<<<< HEAD
-        _close();
-        return;
-=======
 #endif
         return _close();
->>>>>>> mcspr/bearssl
       }
       _handshake_start = _rx_last_packet;
       tcp_ssl_arg(_pcb, this);
@@ -562,16 +534,6 @@ void AsyncClient::_close(){
       tcp_ssl_free(_pcb);
     }
 #endif
-<<<<<<< HEAD
-    clearTcpCallbacks(_pcb);
-    err_t err = tcp_close(_pcb);
-    if(ERR_OK == err) {
-      setCloseError(err);
-      ASYNC_TCP_DEBUG("_close[%u]: AsyncClient 0x%" PRIXPTR "\n", getConnectionId(), uintptr_t(this));
-    } else {
-      ASYNC_TCP_DEBUG("_close[%u]: abort() called for AsyncClient 0x%" PRIXPTR "\n", getConnectionId(), uintptr_t(this));
-      abort();
-=======
     tcp_arg(_pcb, NULL);
     tcp_sent(_pcb, NULL);
     tcp_recv(_pcb, NULL);
@@ -582,7 +544,6 @@ void AsyncClient::_close(){
       _pcb = NULL;
     } else {
       err = abort();
->>>>>>> mcspr/bearssl
     }
     if(_discard_cb)
       _discard_cb(_discard_cb_arg, this);
@@ -718,11 +679,6 @@ void AsyncClient::_recv(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
     ASYNC_TCP_DEBUG("_recv[%u]: %d\n", getConnectionId(), pb->tot_len);
     int read_bytes = tcp_ssl_read(pcb, pb);
     if(read_bytes < 0){
-<<<<<<< HEAD
-      if (read_bytes != SSL_CLOSE_NOTIFY) {
-        ASYNC_TCP_DEBUG("_recv[%u] err: %d\n", getConnectionId(), read_bytes);
-        _close();
-=======
       switch (read_bytes) {
         case SSL_CLOSE_NOTIFY:
           // All data processed at TCP layer
@@ -739,7 +695,6 @@ void AsyncClient::_recv(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
           _ssl_error(read_bytes);
           tcp_abort(pcb);
           return ERR_ABRT;
->>>>>>> mcspr/bearssl
       }
     }
     return;
@@ -797,26 +752,6 @@ void AsyncClient::_poll(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
   uint32_t now = millis();
 
   // ACK Timeout
-<<<<<<< HEAD
-  if(_pcb_busy && _ack_timeout && (now - _pcb_sent_at) >= _ack_timeout){
-    _pcb_busy = false;
-    if(_timeout_cb)
-      _timeout_cb(_timeout_cb_arg, this, (now - _pcb_sent_at));
-    return;
-  }
-  // RX Timeout
-  if(_rx_since_timeout && (now - _rx_last_packet) >= (_rx_since_timeout * 1000)){
-    ASYNC_TCP_DEBUG("_poll[%u]: RX Timeout.\n", errorTracker->getConnectionId() );
-    _close();
-    return;
-  }
-#if ASYNC_TCP_SSL_ENABLED
-  // SSL Handshake Timeout
-  if(_pcb_secure && !_handshake_done && (now - _rx_last_packet) >= 2000){
-    ASYNC_TCP_DEBUG("_poll[%u]: SSL Handshake Timeout.\n", errorTracker->getConnectionId() );
-    _close();
-    return;
-=======
   if(_pcb_busy && _ack_timeout) {
     uint32_t time_delta = now - _pcb_sent_at;
     if(time_delta >= _ack_timeout){
@@ -861,7 +796,6 @@ void AsyncClient::_poll(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
       //return ERR_OK;
     }
 #endif
->>>>>>> mcspr/bearssl
   }
 #endif
   // Everything is fine
@@ -877,11 +811,7 @@ void AsyncClient::_dns_found(const char *host, const ip_addr *ipaddr){
 #endif
   if(ipaddr){
 #if ASYNC_TCP_SSL_ENABLED
-<<<<<<< HEAD
-    connect(ipaddr, _connect_port, _pcb_secure);
-=======
     connect(IPAddress(ipaddr->addr), _connect_port, _pcb_secure, host);
->>>>>>> mcspr/bearssl
 #else
     connect(ipaddr, _connect_port);
 #endif
@@ -900,12 +830,7 @@ void AsyncClient::_s_dns_found(const char *host, ip_addr_t *ipaddr, void *arg){
 #else
 void AsyncClient::_s_dns_found(const char *host, const ip_addr *ipaddr, void *arg){
 #endif
-<<<<<<< HEAD
-  (void)name;
-  reinterpret_cast<AsyncClient*>(arg)->_dns_found(ipaddr);
-=======
   reinterpret_cast<AsyncClient*>(arg)->_dns_found(host, ipaddr);
->>>>>>> mcspr/bearssl
 }
 
 err_t AsyncClient::_s_poll(void *arg, struct tcp_pcb *tpcb) {
@@ -961,17 +886,7 @@ void AsyncClient::_s_handshake(void *arg, struct tcp_pcb *tcp, SSL *ssl){
     c->_connect_cb(c->_connect_cb_arg, c);
 }
 
-<<<<<<< HEAD
-void AsyncClient::_s_ssl_error(void *arg, struct tcp_pcb *tcp, int8_t err){
-  (void)tcp;
-#ifdef DEBUG_ESP_ASYNC_TCP
-  AsyncClient *c = reinterpret_cast<AsyncClient*>(arg);
-  auto errorTracker = c->getACErrorTracker();
-  ASYNC_TCP_DEBUG("_ssl_error[%u] err = %d\n", errorTracker->getConnectionId(), err);
-#endif
-=======
 void AsyncClient::_s_ssl_error(void *arg, struct tcp_pcb *tcp, err_t err){
->>>>>>> mcspr/bearssl
   reinterpret_cast<AsyncClient*>(arg)->_ssl_error(err);
 }
 #endif
@@ -1290,17 +1205,8 @@ AsyncServer::AsyncServer(IPAddress addr, uint16_t port)
   , _file_cb(0)
   , _file_cb_arg(0)
 #endif
-<<<<<<< HEAD
-{
-#ifdef DEBUG_MORE
-  for (size_t i=0; i<EE_MAX; ++i)
-    _event_count[i] = 0;
-#endif
-}
-=======
 #endif
 {}
->>>>>>> mcspr/bearssl
 
 AsyncServer::AsyncServer(uint16_t port)
   : _port(port)
@@ -1316,17 +1222,8 @@ AsyncServer::AsyncServer(uint16_t port)
   , _file_cb(0)
   , _file_cb_arg(0)
 #endif
-<<<<<<< HEAD
-  {
-#ifdef DEBUG_MORE
-    for (size_t i=0; i<EE_MAX; ++i)
-      _event_count[i] = 0;
-#endif
-  }
-=======
 #endif
 {}
->>>>>>> mcspr/bearssl
 
 AsyncServer::~AsyncServer(){
   end();
@@ -1338,47 +1235,7 @@ void AsyncServer::onClient(AcConnectHandler cb, void* arg){
 }
 
 #if ASYNC_TCP_SSL_ENABLED
-<<<<<<< HEAD
-void AsyncServer::onSslFileRequest(AcSSlFileHandler cb, void* arg){
-  _file_cb = cb;
-  _file_cb_arg = arg;
-}
-#endif
-
-void AsyncServer::begin(){
-  if(_pcb)
-    return;
-
-  int8_t err;
-  tcp_pcb* pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
-  if (!pcb){
-    return;
-  }
-
-  tcp_setprio(pcb, TCP_PRIO_MIN);
-  IPAddress local_addr;
-  local_addr = _addr;
-  err = tcp_bind(pcb, local_addr, _port);
-  // Failures are ERR_ISCONN or ERR_USE
-  if (err != ERR_OK) {
-    tcp_close(pcb);
-    return;
-  }
-
-  tcp_pcb* listen_pcb = tcp_listen(pcb);
-  if (!listen_pcb) {
-    tcp_close(pcb);
-    return;
-  }
-  _pcb = listen_pcb;
-  tcp_arg(_pcb, (void*) this);
-  tcp_accept(_pcb, &_s_accept);
-}
-
-#if ASYNC_TCP_SSL_ENABLED
-=======
 #if ASYNC_TCP_SSL_AXTLS
->>>>>>> mcspr/bearssl
 void AsyncServer::beginSecure(const char *cert, const char *key, const char *password){
   if(_ssl_ctx){
     return;
@@ -1505,10 +1362,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
     else
       tcp_nagle_enable(pcb);
 
-<<<<<<< HEAD
-=======
     AsyncClient *c;
->>>>>>> mcspr/bearssl
 #if ASYNC_TCP_SSL_ENABLED
     if(_ssl_ctx){
       if(tcp_ssl_has_client() || _pending){
@@ -1521,11 +1375,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
           }
           return ERR_OK;
         }
-<<<<<<< HEAD
-        //1 ASYNC_TCP_DEBUG("### put to wait: %d\n", _clients_waiting);
-=======
         //ASYNC_TCP_DEBUG("### put to wait: %d\n", _clients_waiting);
->>>>>>> mcspr/bearssl
         new_item->pcb = pcb;
         new_item->pb = NULL;
         new_item->next = NULL;
@@ -1543,11 +1393,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
           p->next = new_item;
         }
       } else {
-<<<<<<< HEAD
-        AsyncClient *c = new (std::nothrow) AsyncClient(pcb, _ssl_ctx);
-=======
         c = new AsyncClient(pcb, _ssl_ctx);
->>>>>>> mcspr/bearssl
         if(c){
           ASYNC_TCP_DEBUG("_accept[%u]: SSL connected\n", c->getConnectionId());
           c->onConnect([this](void * arg, AsyncClient *c){
@@ -1564,33 +1410,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
       }
       return ERR_OK;
     } else {
-<<<<<<< HEAD
-      AsyncClient *c = new (std::nothrow) AsyncClient(pcb, NULL);
-#else
-      AsyncClient *c = new (std::nothrow) AsyncClient(pcb);
-#endif
-
-      if(c){
-        auto errorTracker = c->getACErrorTracker();
-#ifdef DEBUG_MORE
-        errorTracker->onErrorEvent(
-          [](void *obj, size_t ee){ ((AsyncServer*)(obj))->incEventCount(ee); },
-          this);
-#endif
-        ASYNC_TCP_DEBUG("_accept[%u]: connected\n", errorTracker->getConnectionId());
-        _connect_cb(_connect_cb_arg, c);
-        return errorTracker->getCallbackCloseError();
-      } else {
-        ASYNC_TCP_DEBUG("_accept: new AsyncClient() failed, connection aborted!\n");
-        if(tcp_close(pcb) != ERR_OK){
-          tcp_abort(pcb);
-          return ERR_ABRT;
-        }
-      }
-#if ASYNC_TCP_SSL_ENABLED
-=======
       c = new AsyncClient(pcb, NULL);
->>>>>>> mcspr/bearssl
     }
 #else
     c = new AsyncClient(pcb);
@@ -1625,13 +1445,8 @@ err_t AsyncServer::_poll(tcp_pcb* pcb){
       p->next = b->next;
       p = b;
     }
-<<<<<<< HEAD
-    //1 ASYNC_TCP_DEBUG("### remove from wait: %d\n", _clients_waiting);
-    AsyncClient *c = new (std::nothrow) AsyncClient(pcb, _ssl_ctx);
-=======
     //ASYNC_TCP_DEBUG("### remove from wait: %d\n", _clients_waiting);
     AsyncClient *c = new AsyncClient(pcb, _ssl_ctx);
->>>>>>> mcspr/bearssl
     if(c){
       c->onConnect([this](void * arg, AsyncClient *c){
         (void)arg;
@@ -1657,11 +1472,7 @@ err_t AsyncServer::_recv(struct tcp_pcb *pcb, struct pbuf *pb, err_t err){
   struct pending_pcb * p;
 
   if(!pb){
-<<<<<<< HEAD
-    //1 ASYNC_TCP_DEBUG("### close from wait: %d\n", _clients_waiting);
-=======
     //ASYNC_TCP_DEBUG("### close from wait: %d\n", _clients_waiting);
->>>>>>> mcspr/bearssl
     p = _pending;
     if(p->pcb == pcb){
       _pending = _pending->next;
@@ -1682,11 +1493,7 @@ err_t AsyncServer::_recv(struct tcp_pcb *pcb, struct pbuf *pb, err_t err){
       return ERR_ABRT;
     }
   } else {
-<<<<<<< HEAD
-    //1 ASYNC_TCP_DEBUG("### wait _recv: %u %d\n", pb->tot_len, _clients_waiting);
-=======
     //ASYNC_TCP_DEBUG("### wait _recv: %u %d\n", pb->tot_len, _clients_waiting);
->>>>>>> mcspr/bearssl
     p = _pending;
     while(p && p->pcb != pcb)
       p = p->next;

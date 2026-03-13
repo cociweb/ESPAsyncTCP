@@ -23,16 +23,13 @@
 #define SYNCCLIENT_H_
 
 #include "Client.h"
-<<<<<<< HEAD
+#include "tcp_bearssl_helpers.h"
 // Needed for Arduino core releases prior to 2.5.0, because of changes
 // made to accommodate Arduino core 2.5.0
 // CONST was 1st defined in Core 2.5.0 in IPAddress.h
 #ifndef CONST
 #define CONST
 #endif
-=======
-#include "tcp_bearssl_helpers.h"
->>>>>>> mcspr/bearssl
 #include <async_config.h>
 class cbuf;
 class AsyncClient;

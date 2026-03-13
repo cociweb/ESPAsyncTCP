@@ -26,9 +26,14 @@
 #include <async_config.h>
 #include <IPAddress.h>
 #include <functional>
+<<<<<<< HEAD
+#include <memory>
+
+=======
 #include <WString.h>
 #include <pgmspace.h>
 	
+>>>>>>> mcspr/bearssl
 extern "C" {
     #include "lwip/init.h"
     #include "lwip/err.h"
@@ -36,6 +41,8 @@ extern "C" {
 };
 
 class AsyncClient;
+class AsyncServer;
+class ACErrorTracker;
 
 #define ASYNC_MAX_ACK_TIME 10000
 #define ASYNC_WRITE_FLAG_COPY 0x01 //will allocate new buffer to hold the data while sending (else will hold reference to the data given)
@@ -61,6 +68,54 @@ typedef std::function<void(void*, AsyncClient*, err_t error)> AcErrorHandler;
 typedef std::function<void(void*, AsyncClient*, void *data, size_t len)> AcDataHandler;
 typedef std::function<void(void*, AsyncClient*, struct pbuf *pb)> AcPacketHandler;
 typedef std::function<void(void*, AsyncClient*, uint32_t time)> AcTimeoutHandler;
+typedef std::function<void(void*, size_t event)> AsNotifyHandler;
+
+enum error_events {
+  EE_OK = 0,
+  EE_ABORTED,       // Callback or foreground aborted connections
+  EE_ERROR_CB,      // Stack initiated aborts via error Callbacks.
+  EE_CONNECTED_CB,
+  EE_RECV_CB,
+  EE_ACCEPT_CB,
+  EE_MAX
+};
+// DEBUG_MORE is for gathering more information on which CBs close events are
+// occuring and count.
+// #define DEBUG_MORE 1
+class ACErrorTracker {
+  private:
+    AsyncClient *_client;
+    err_t _close_error;
+    int _errored;
+#if DEBUG_ESP_ASYNC_TCP
+    size_t _connectionId;
+#endif
+#ifdef DEBUG_MORE
+    AsNotifyHandler _error_event_cb;
+    void* _error_event_cb_arg;
+#endif
+
+  protected:
+    friend class AsyncClient;
+    friend class AsyncServer;
+#ifdef DEBUG_MORE
+    void onErrorEvent(AsNotifyHandler cb, void *arg);
+#endif
+#if DEBUG_ESP_ASYNC_TCP
+    void setConnectionId(size_t id) { _connectionId=id;}
+    size_t getConnectionId(void) { return _connectionId;}
+#endif
+    void setCloseError(err_t e);
+    void setErrored(size_t errorEvent);
+    err_t getCallbackCloseError(void);
+    void clearClient(void){ if (_client) _client = NULL;}
+
+  public:
+    err_t getCloseError(void) const { return _close_error;}
+    bool hasClient(void) const { return (_client != NULL);}
+    ACErrorTracker(AsyncClient *c);
+    ~ACErrorTracker() {}
+};
 
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_BEARSSL
@@ -74,6 +129,7 @@ typedef std::function<int(void*, AsyncClient*, void *dn_hash, size_t dn_hash_len
 class AsyncClient {
   protected:
     friend class AsyncTCPbuffer;
+    friend class AsyncServer;
     tcp_pcb* _pcb;
     AcConnectHandler _connect_cb;
     void* _connect_cb_arg;
@@ -110,15 +166,16 @@ class AsyncClient {
     bool _ack_pcb;
     uint32_t _tx_unacked_len;
     uint32_t _tx_acked_len;
-    uint32_t _tx_unsent_len;
     uint32_t _rx_ack_len;
     uint32_t _rx_last_packet;
     uint32_t _rx_since_timeout;
     uint32_t _ack_timeout;
     uint16_t _connect_port;
+    u8_t _recv_pbuf_flags;
+    std::shared_ptr<ACErrorTracker> _errorTracker;
 
-    int8_t _close();
-    err_t _connected(void* pcb, err_t err);
+    void _close();
+    void _connected(std::shared_ptr<ACErrorTracker>& closeAbort, void* pcb, err_t err);
     void _error(err_t err);
 #if ASYNC_TCP_SSL_ENABLED
     void _ssl_error(err_t err);
@@ -126,8 +183,8 @@ class AsyncClient {
     int _ssl_certlookup(void *dn_hash, size_t dn_hash_len, uint8_t **buf);
 #endif
 #endif
-    err_t _poll(tcp_pcb* pcb);
-    err_t _sent(tcp_pcb* pcb, uint16_t len);
+    void _poll(std::shared_ptr<ACErrorTracker>& closeAbort, tcp_pcb* pcb);
+    void _sent(std::shared_ptr<ACErrorTracker>& closeAbort, tcp_pcb* pcb, uint16_t len);
 #if LWIP_VERSION_MAJOR == 1
     void _dns_found(const char *host, struct ip_addr *ipaddr);
 #else
@@ -153,6 +210,8 @@ class AsyncClient {
     SSL_CTX_PARAMS _ssl_params;
 #endif
 #endif
+    std::shared_ptr<ACErrorTracker> getACErrorTracker(void) const { return _errorTracker; };
+    void setCloseError(err_t e) const { _errorTracker->setCloseError(e);}
 
   public:
     AsyncClient* prev;
@@ -182,7 +241,7 @@ class AsyncClient {
 #endif
     void close(bool now = false);
     void stop();
-    int8_t abort();
+    void abort();
     bool free();
 
     bool canSend();//ack is not pending
@@ -191,7 +250,10 @@ class AsyncClient {
     bool send();//send all data added with the method above
     size_t ack(size_t len); //ack data that you have not acked using the method below
     void ackLater(){ _ack_pcb = false; } //will not ack the current packet. Call from onData
-
+    bool isRecvPush(){ return !!(_recv_pbuf_flags & PBUF_FLAG_PUSH); }
+#if DEBUG_ESP_ASYNC_TCP
+    size_t getConnectionId(void) const { return _errorTracker->getConnectionId();}
+#endif
 #if ASYNC_TCP_SSL_ENABLED
     SSL *getSSL();
 #if ASYNC_TCP_SSL_BEARSSL
@@ -219,9 +281,7 @@ class AsyncClient {
     void setAckTimeout(uint32_t timeout);//no ACK timeout for the last sent packet in milliseconds
     void setNoDelay(bool nodelay);
     bool getNoDelay();
-    uint32_t getRemoteAddress();
     uint16_t getRemotePort();
-    uint32_t getLocalAddress();
     uint16_t getLocalPort();
 
     IPAddress remoteIP();
@@ -236,6 +296,13 @@ class AsyncClient {
     void onData(AcDataHandler cb, void* arg = 0);           //data received (called if onPacket is not used)
     void onPacket(AcPacketHandler cb, void* arg = 0);       //data received
     void onTimeout(AcTimeoutHandler cb, void* arg = 0);     //ack timeout
+<<<<<<< HEAD
+    void onPoll(AcConnectHandler cb, void* arg = 0);        //every 125ms when connected
+    void ackPacket(struct pbuf * pb);
+
+    const char * errorToString(err_t error);
+    const char * stateToString();
+=======
     void onPoll(AcConnectHandler cb, void* arg = 0);        //every 2*TCP_TMR_INTERVAL when connected
 
 #if ASYNC_TCP_SSL_ENABLED
@@ -250,8 +317,10 @@ class AsyncClient {
 
     static PGM_P errorToString(int8_t error);
     PGM_P stateToString();
+>>>>>>> mcspr/bearssl
 
-    err_t _recv(tcp_pcb* pcb, pbuf* pb, err_t err);
+    void _recv(std::shared_ptr<ACErrorTracker>& closeAbort, tcp_pcb* pcb, pbuf* pb, err_t err);
+    err_t getCloseError(void) const { return _errorTracker->getCloseError();}
 };
 
 #if ASYNC_TCP_SSL_ENABLED
@@ -260,6 +329,7 @@ typedef std::function<int(void* arg, const char *filename, uint8_t **buf)intcSSl
 #endif
 struct pending_pcb;
 #endif
+
 
 class AsyncServer {
   protected:
@@ -276,6 +346,11 @@ class AsyncServer {
     AcSSlFileHandler _file_cb;
     void* _file_cb_arg;
 #endif
+<<<<<<< HEAD
+#ifdef DEBUG_MORE
+    int _event_count[EE_MAX];
+=======
+>>>>>>> mcspr/bearssl
 #endif
 
   public:
@@ -294,10 +369,15 @@ class AsyncServer {
     void setNoDelay(bool nodelay);
     bool getNoDelay();
     uint8_t status();
-
+#ifdef DEBUG_MORE
+    int getEventCount(size_t ee) const { return _event_count[ee];}
+#endif
   protected:
     err_t _accept(tcp_pcb* newpcb, err_t err);
     static err_t _s_accept(void *arg, tcp_pcb* newpcb, err_t err);
+#ifdef DEBUG_MORE
+    int incEventCount(size_t ee) { return ++_event_count[ee];}
+#endif
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_AXTLS
     int _cert(const char *filename, uint8_t **buf);

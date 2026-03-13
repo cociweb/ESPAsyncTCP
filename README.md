@@ -1,16 +1,60 @@
+![https://avatars.githubusercontent.com/u/195753706?s=96&v=4](https://avatars.githubusercontent.com/u/195753706?s=96&v=4)
+
+
 # ESPAsyncTCP
-[![Build Status](https://travis-ci.org/Adam5Wu/ESPAsyncTCP.svg?branch=adam5wu/master)](https://travis-ci.org/Adam5Wu/ESPAsyncTCP)
-[![GitHub issues](https://img.shields.io/github/issues/Adam5Wu/ESPAsyncTCP.svg)](https://github.com/Adam5Wu/ESPAsyncTCP/issues)
-[![GitHub forks](https://img.shields.io/github/forks/Adam5Wu/ESPAsyncTCP.svg)](https://github.com/Adam5Wu/ESPAsyncTCP/network)
-[![License](https://img.shields.io/github/license/Adam5Wu/ESPAsyncTCP.svg)](./LICENSE.txt)
+[![Build Status](https://travis-ci.org/cociweb/ESPAsyncTCP.svg?branch=cociweb/master)](https://travis-ci.org/cociweb/ESPAsyncTCP)
+[![GitHub issues](https://img.shields.io/github/issues/cociweb/ESPAsyncTCP.svg)](https://github.com/cociweb/ESPAsyncTCP/issues)
+[![GitHub forks](https://img.shields.io/github/forks/cociweb/ESPAsyncTCP.svg)](https://github.com/cociweb/ESPAsyncTCP/network)
+[![License](https://img.shields.io/github/license/cociweb/ESPAsyncTCP.svg)](./LICENSE.txt)
 
 This is a fully asynchronous TCP library, aimed at enabling trouble-free, multi-connection network environment for Espressif's ESP8266 MCUs.
 
 Modified to works with BearSSL port, which brings compatiblility with brokers using ECDSA certificates, supports SNI, and [maximum fragment length negotiation](https://tools.ietf.org/html/rfc6066#page-8).
 
-* [Upstream Project](https://github.com/me-no-dev/ESPAsyncTCP-esp8266)
+* [Upstream Project](https://github.com/ESP32Async/ESPAsyncTCP])
 * [Modifications of this fork](MODIFICATIONS.md)
 * Requires:
 	- [ESP8266 Arduino Core fork](https://github.com/Adam5Wu/Arduino)
+	OR
+	- [ESP8266 Arduino Core](https://github.com/esp8266/Arduino)
 * Potentially interesting:
-	- [ESP8266 BearSSL Port fork](https://github.com/Adam5Wu/bearssl-esp8266)
+	- [ESP8266 BearSSL Port fork by Adam5Wu](https://github.com/Adam5Wu/bearssl-esp8266)
+	- [ESP8266 BearSSL Port fork by mcspr](https://github.com/mcspr/ESPAsyncTCP)
+	- [ESP8266 BearSSL Port by Earle Philhower](https://github.com/earlephilhower/bearssl-esp8266)
+
+Please see the new links:
+
+- `ESP32Async/ESPAsyncWebServer @ 3.6.0` (ESP32, ESP8266, RP2040)
+- `ESP32Async/AsyncTCP @ 3.3.2` (ESP32)
+- `ESP32Async/ESPAsyncTCP @ 2.0.0` (ESP8266)
+- `cociweb/ESPAsyncTCP @ 2.0.1` (ESP8266)
+- `https://github.com/ESP32Async/AsyncTCPSock/archive/refs/tags/v1.0.3-dev.zip` (AsyncTCP alternative for ESP32)
+- `khoih-prog/AsyncTCP_RP2040W @ 1.2.0` (RP2040)
+
+### Async TCP Library for ESP8266 Arduino
+
+For ESP32 look [https://github.com/ESP32Async/AsyncTCP](https://github.com/ESP32Async/AsyncTCP)
+
+This is a fully asynchronous TCP library, aimed at enabling trouble-free, multi-connection network environment for Espressif's ESP8266 MCUs.
+
+This library is the base for [https://github.com/ESP32Async/ESPAsyncWebServer](https://github.com/ESP32Async/ESPAsyncWebServer)
+
+## AsyncClient and AsyncServer
+The base classes on which everything else is built. They expose all possible scenarios, but are really raw and require more skills to use.
+
+## AsyncPrinter
+This class can be used to send data like any other ```Print``` interface (```Serial``` for example).
+The object then can be used outside of the Async callbacks (the loop) and receive asynchronously data using ```onData```. The object can be checked if the underlying ```AsyncClient```is connected, or hook to the ```onDisconnect``` callback.
+
+## AsyncTCPbuffer
+This class is really similar to the ```AsyncPrinter```, but it differs in the fact that it can buffer some of the incoming data.
+
+## SyncClient
+It is exactly what it sounds like. This is a standard, blocking TCP Client, similar to the one included in ```ESP8266WiFi```
+
+## Libraries and projects that use AsyncTCP
+- [ESP Async Web Server](https://github.com/ESP32Async/ESPAsyncWebServer)
+- [Async MQTT client](https://github.com/marvinroger/async-mqtt-client)
+- [arduinoWebSockets](https://github.com/Links2004/arduinoWebSockets)
+- [ESP8266 Smart Home](https://github.com/baruch/esp8266_smart_home)
+- [KBox Firmware](https://github.com/sarfata/kbox-firmware)

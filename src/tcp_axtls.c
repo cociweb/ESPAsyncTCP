@@ -22,14 +22,9 @@
  * Compatibility for AxTLS with LWIP raw tcp mode (http://lwip.wikia.com/wiki/Raw/TCP)
  * Original Code and Inspiration: Slavey Karadzhov
  */
-
-// To handle all the definitions needed for debug printing, we need to delay
-// macro definitions till later.
-#define DEBUG_SKIP__DEBUG_PRINT_MACROS 1
 #include <async_config.h>
-#undef DEBUG_SKIP__DEBUG_PRINT_MACROS
 
-#if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_AXTLS
 
 #include "lwip/opt.h"
 #include "lwip/tcp.h"
@@ -37,15 +32,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <tcp_axtls.h>
-
-// ets_uart_printf is defined in esp8266_undocumented.h, in newer Arduino ESP8266 Core.
-extern int ets_uart_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-#include <DebugPrintMacros.h>
-#ifndef TCP_SSL_DEBUG
-#define TCP_SSL_DEBUG(...) do { (void)0;} while(false)
-#endif
 
 uint8_t * default_private_key = NULL;
 uint16_t default_private_key_len = 0;
@@ -118,6 +105,7 @@ uint8_t tcp_ssl_has_client(){
 
 tcp_ssl_t * tcp_ssl_new(struct tcp_pcb *tcp) {
 
+  TCP_SSL_DEBUG("axTLS %s\n", ssl_version());
   if(tcp_ssl_next_fd < 0){
     tcp_ssl_next_fd = 0;//overflow
   }
@@ -390,8 +378,7 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
 
   do {
     read_bytes = ssl_read(fd_data->ssl, &read_buf);
-    TCP_SSL_DEBUG("tcp_ssl_ssl_read: %d\n", read_bytes);
-
+    //TCP_SSL_DEBUG("tcp_ssl_ssl_read: %d\n", read_bytes);
     if(read_bytes < SSL_OK) {
       if(read_bytes != SSL_CLOSE_NOTIFY) {
         TCP_SSL_DEBUG("tcp_ssl_read: read error: %d\n", read_bytes);
@@ -401,31 +388,20 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
     } else if(read_bytes > 0){
       if(fd_data->on_data){
         fd_data->on_data(fd_data->arg, tcp, read_buf, read_bytes);
-        // fd_data may have been freed in callback
-        fd_data = tcp_ssl_get(tcp);
-        if(NULL == fd_data)
-          return SSL_CLOSE_NOTIFY;
       }
       total_bytes+= read_bytes;
     } else {
       if(fd_data->handshake != SSL_OK) {
-        // fd_data may be freed in callbacks.
-        int handshake = fd_data->handshake = ssl_handshake_status(fd_data->ssl);
-        if(handshake == SSL_OK){
-          TCP_SSL_DEBUG("tcp_ssl_read: handshake OK\n");
+        fd_data->handshake = ssl_handshake_status(fd_data->ssl);
+        if(fd_data->handshake == SSL_OK){
+          //TCP_SSL_DEBUG("tcp_ssl_read: handshake OK\n");
           if(fd_data->on_handshake)
             fd_data->on_handshake(fd_data->arg, fd_data->tcp, fd_data->ssl);
-          fd_data = tcp_ssl_get(tcp);
-          if(NULL == fd_data)
-            return SSL_CLOSE_NOTIFY;
-        } else if(handshake != SSL_NOT_OK){
-          TCP_SSL_DEBUG("tcp_ssl_read: handshake error: %d\n", handshake);
+        } else if(fd_data->handshake != SSL_NOT_OK){
+          TCP_SSL_DEBUG("tcp_ssl_read: handshake error: %d\n", fd_data->handshake);
           if(fd_data->on_error)
-            fd_data->on_error(fd_data->arg, fd_data->tcp, handshake);
-          return handshake;
-          // With current code APP gets called twice at onError handler.
-          // Once here and again after return when handshake != SSL_CLOSE_NOTIFY.
-          // As always APP must never free resources at onError only at onDisconnect.
+            fd_data->on_error(fd_data->arg, fd_data->tcp, fd_data->handshake);
+          return fd_data->handshake;
         }
       }
     }
@@ -444,6 +420,10 @@ SSL * tcp_ssl_get_ssl(struct tcp_pcb *tcp){
     return tcp_ssl->ssl;
   }
   return NULL;
+}
+
+void tcp_ssl_ctx_free(SSL_CTX* ssl_ctx) {
+  ssl_ctx_free(ssl_ctx);
 }
 
 bool tcp_ssl_has(struct tcp_pcb *tcp){
@@ -550,13 +530,13 @@ int ax_port_write(int fd, uint8_t *data, uint16_t len) {
       TCP_SSL_DEBUG("ax_port_write: No memory %d (%d)\n", tcp_len, len);
       return err;
     }
-    TCP_SSL_DEBUG("ax_port_write: tcp_write error: %ld\n", err);
+    TCP_SSL_DEBUG("ax_port_write: tcp_write error: %d\n", err);
     return err;
   } else if (err == ERR_OK) {
     //TCP_SSL_DEBUG("ax_port_write: tcp_output: %d / %d\n", tcp_len, len);
     err = tcp_output(fd_data->tcp);
     if(err != ERR_OK) {
-      TCP_SSL_DEBUG("ax_port_write: tcp_output err: %ld\n", err);
+      TCP_SSL_DEBUG("ax_port_write: tcp_output err: %d\n", err);
       return err;
     }
   }

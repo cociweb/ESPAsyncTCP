@@ -126,6 +126,9 @@ int SyncClient::_connect(const IPAddress& ip, uint16_t port){
   _client->onConnect([](void *obj, AsyncClient *c){ ((SyncClient*)(obj))->_onConnect(c); }, this);
   _attachCallbacks_Disconnect();
 #if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_BEARSSL
+  _client->setSSLParams(_ssl_params);
+#endif
   if(_client->connect(ip, port, secure)){
 #else
   if(_client->connect(ip, port)){
@@ -154,6 +157,9 @@ int SyncClient::connect(const char *host, uint16_t port){
   _client->onConnect([](void *obj, AsyncClient *c){ ((SyncClient*)(obj))->_onConnect(c); }, this);
   _attachCallbacks_Disconnect();
 #if ASYNC_TCP_SSL_ENABLED
+#if ASYNC_TCP_SSL_BEARSSL
+  _client->setSSLParams(_ssl_params);
+#endif
   if(_client->connect(host, port, secure)){
 #else
   if(_client->connect(host, port)){

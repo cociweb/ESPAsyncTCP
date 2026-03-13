@@ -695,13 +695,13 @@ void AsyncClient::_recv(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
         case SSL_CANNOT_READ:
           // SSL engine unable to take the data
           // Report out-of-memory
-          return ERR_MEM;
+          return;
 #endif
         default:
           // Unexpected error, abort connection
           _ssl_error(read_bytes);
           tcp_abort(pcb);
-          return ERR_ABRT;
+          return;
       }
     }
     return;

@@ -248,9 +248,8 @@ class AsyncClient {
     size_t ack(size_t len); //ack data that you have not acked using the method below
     void ackLater(){ _ack_pcb = false; } //will not ack the current packet. Call from onData
     bool isRecvPush(){ return !!(_recv_pbuf_flags & PBUF_FLAG_PUSH); }
-#if DEBUG_ESP_ASYNC_TCP
     size_t getConnectionId(void) const { return _errorTracker->getConnectionId();}
-#endif
+#if DEBUG_ESP_ASYNC_TCP
 #if ASYNC_TCP_SSL_ENABLED
     SSL *getSSL();
 #if ASYNC_TCP_SSL_BEARSSL

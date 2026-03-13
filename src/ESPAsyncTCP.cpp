@@ -101,6 +101,13 @@ ACErrorTracker::ACErrorTracker(AsyncClient *c):
 #endif
 {}
 
+uint32_t ACErrorTracker::getConnectionId(void) const {
+  if (_client) {
+    return _client->getConnectionId();
+  }
+  return 0;
+}
+
 #ifdef DEBUG_MORE
 /**
  * This is not necessary, but a start at gathering some statistics on
@@ -759,7 +766,7 @@ void AsyncClient::_poll(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
       _pcb_busy = false;
       if(_timeout_cb)
         _timeout_cb(_timeout_cb_arg, this, time_delta);
-      return ERR_OK;
+      return;
     }
   }
   // RX Timeout
@@ -769,7 +776,7 @@ void AsyncClient::_poll(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
       ASYNC_TCP_DEBUG("_poll: rx timeout %d\n", time_delta);
       if(_timeout_cb)
         _timeout_cb(_timeout_cb_arg, this, time_delta);
-      return ERR_OK;
+      return;
     }
   }
 #if ASYNC_TCP_SSL_ENABLED
@@ -780,7 +787,7 @@ void AsyncClient::_poll(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
       ASYNC_TCP_DEBUG("_poll: handshake timeout %d\n", time_delta);
       if(_timeout_cb)
         _timeout_cb(_timeout_cb_arg, this, time_delta);
-      return ERR_OK;
+      return;
     }
   }
   if(_pcb_secure){
@@ -1139,7 +1146,7 @@ void AsyncClient::ackPacket(struct pbuf * pb){
   pbuf_free(pb);
 }
 
-const char * AsyncClient::errorToString(err_t error) {
+PGM_P AsyncClient::errorToString(int8_t error) {
   switch (error) {
     case ERR_OK:         return "No error, everything OK";
     case ERR_MEM:        return "Out of memory error";

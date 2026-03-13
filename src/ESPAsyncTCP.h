@@ -109,6 +109,7 @@ class ACErrorTracker {
   public:
     err_t getCloseError(void) const { return _close_error;}
     bool hasClient(void) const { return (_client != NULL);}
+    uint32_t getConnectionId(void) const;
     ACErrorTracker(AsyncClient *c);
     ~ACErrorTracker() {}
 };

@@ -313,7 +313,7 @@ void onPoll(AcConnectHandler cb, void* arg = 0);        //every 2*TCP_TMR_INTERV
 
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_AXTLS
-typedef std::function<int(void* arg, const char *filename, uint8_t **buf)intcSSlFileHandler;
+typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> cSSlFileHandler;
 #endif
 struct pending_pcb;
 #endif

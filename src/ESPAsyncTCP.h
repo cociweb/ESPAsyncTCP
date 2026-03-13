@@ -357,6 +357,7 @@ class AsyncServer {
 #ifdef DEBUG_MORE
     int getEventCount(size_t ee) const { return _event_count[ee];}
 #endif
+#endif
   protected:
     err_t _accept(tcp_pcb* newpcb, err_t err);
     static err_t _s_accept(void *arg, tcp_pcb* newpcb, err_t err);

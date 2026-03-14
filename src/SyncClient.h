@@ -22,6 +22,7 @@
 #ifndef SYNCCLIENT_H_
 #define SYNCCLIENT_H_
 
+#include <async_config.h>
 #include "Client.h"
 #include "tcp_bearssl_helpers.h"
 // Needed for Arduino core releases prior to 2.5.0, because of changes
@@ -30,7 +31,6 @@
 #ifndef CONST
 #define CONST
 #endif
-#include <async_config.h>
 class cbuf;
 class AsyncClient;
 

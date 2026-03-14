@@ -37,6 +37,9 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+// Include BearSSL headers for type definitions
+#include <bearssl/bearssl.h>
+
 #include <tcp_bearssl.h>
 
 #ifndef BEARSSL_HEAPDEBUG

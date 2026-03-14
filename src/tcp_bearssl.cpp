@@ -181,18 +181,17 @@ void tcp_ssl_ctx_free(SSL_CTX* ctx) {
     ctx->_iobuf_out = nullptr;
     ctx->_iobuf_in = nullptr;
     stack_thunk_del_ref();
-    free(ctx);
+    delete ctx;
 }
 
 static SSL_CTX* tcp_ssl_ctx_new(SSL_CTX_PARAMS& params) {
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(SSL_CTX) %d\n", sizeof(SSL_CTX));
-    SSL_CTX* ssl_ctx = (SSL_CTX*) malloc(sizeof(SSL_CTX));
+    SSL_CTX* ssl_ctx = new SSL_CTX();
     if(!ssl_ctx){
         TCP_SSL_DEBUG("ssl_ctx_new: failed to allocate ssl context buffer\n");
         return nullptr;
     }
-    memset(ssl_ctx, 0, sizeof(SSL_CTX));
 
     HEAP_DEBUG("free heap = %5d\n", system_get_free_heap_size());
     HEAP_DEBUG("malloc(iobuf) in=%u out=%u\n", params.iobuf_in_size, params.iobuf_out_size);
@@ -614,7 +613,7 @@ static void tcp_ssl_handshake_pump(void*) {
             size_t to_copy = 0;
             unsigned char *recv_buf = br_ssl_engine_recvrec_buf(engine, &_recv_len);
             if(recv_buf) {
-                to_copy = _recv_len < buflen ? _recv_len : buflen;
+                to_copy = _recv_len < (size_t)buflen ? _recv_len : (size_t)buflen;
                 HS_DEBUG("tcp_ssl_handshake_pump: consuming %d / %d\n",
                     to_copy, buflen);
                 to_copy = pbuf_copy_partial(pbuf_handshake, recv_buf, to_copy,
@@ -717,7 +716,7 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
     size_t _recv_len = 0;
     unsigned char *recv_buf = br_ssl_engine_recvrec_buf(engine, &_recv_len);
     if(recv_buf) {
-      int to_copy = _recv_len < pbuf_size ? _recv_len : pbuf_size;
+      int to_copy = _recv_len < (size_t)pbuf_size ? _recv_len : (size_t)pbuf_size;
       NET_DEBUG("tcp_ssl_read: consuming %d / %d\n", to_copy, pbuf_size);
       to_copy = pbuf_copy_partial(p, recv_buf, to_copy, pbuf_offset);
       READ_DEBUG("tcp_ssl_read: consumed %d\n", to_copy);

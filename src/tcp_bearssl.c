@@ -424,16 +424,17 @@ static br_ssl_client_context* br_ssl_client_new(struct tcp_pcb *tcp, SSL_CTX* ct
         br_ssl_engine_set_default_chapol(engine);
 
         ctx->_eng = engine;
-        br_x509_minimal_init(&ctx->_x509_minimal, &br_sha256_vtable, NULL, 0);
+        ctx->_x509_minimal = malloc(sizeof(br_x509_minimal_context));
+        br_x509_minimal_init(ctx->_x509_minimal, &br_sha256_vtable, NULL, 0);
         br_x509_minimal_set_rsa(&ctx->_x509_minimal, br_ssl_engine_get_rsavrfy(engine));
         br_x509_minimal_set_ecdsa(&ctx->_x509_minimal, br_ssl_engine_get_ec(engine), br_ssl_engine_get_ecdsa(engine));
         for (int id = br_md5_ID; id <= br_sha512_ID; id++) {
             const br_hash_class *hc;
             hc = hashes[id - 1];
-            br_x509_minimal_set_hash(&ctx->_x509_minimal, id, hc);
+            br_x509_minimal_set_hash(ctx->_x509_minimal, id, hc);
         }
-        br_x509_minimal_set_dynamic(&ctx->_x509_minimal, tcp, findHashedTA, freeHashedTA);
-        br_ssl_engine_set_x509(engine, &ctx->_x509_minimal.vtable);
+        br_x509_minimal_set_dynamic(ctx->_x509_minimal, tcp, findHashedTA, freeHashedTA);
+        br_ssl_engine_set_x509(engine, &ctx->_x509_minimal->vtable);
         br_ssl_engine_set_buffers_bidi(engine, ctx->_iobuf_in, ctx->_iobuf_in_size, ctx->_iobuf_out, ctx->_iobuf_out_size);
     }
     return cc;

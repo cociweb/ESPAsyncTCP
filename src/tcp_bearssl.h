@@ -28,7 +28,6 @@
 #define ASYNCTCP_SSL_BEARSSL_H
 
 #include <async_config.h>
-#include <memory>
 
 #if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
 

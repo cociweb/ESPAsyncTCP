@@ -296,7 +296,7 @@ bool AsyncClient::connect(const char* host, uint16_t port){
   err_t err = dns_gethostbyname(host, addr, (dns_found_callback)&_s_dns_found, this);
   if(err == ERR_OK) {
 #if ASYNC_TCP_SSL_ENABLED
-    return connect(IPAddress(addr.addr), port, secure, host);
+    return connect(IPAddress(addr), port, secure, host);
 #else
     return connect(addr, port);
 #endif
@@ -314,7 +314,6 @@ bool AsyncClient::connect(const char* host, uint16_t port){
 AsyncClient& AsyncClient::operator=(const AsyncClient& other){
   if(_pcb)
     _close();
-  }
   _errorTracker = other._errorTracker;
 
   // I am confused when "other._pcb" falls out of scope the destructor will
@@ -546,7 +545,7 @@ void AsyncClient::_close(){
     tcp_recv(_pcb, NULL);
     tcp_err(_pcb, NULL);
     tcp_poll(_pcb, NULL, 0);
-    err = tcp_close(_pcb);
+    err_t err = tcp_close(_pcb);
     if(err == ERR_OK) {
       _pcb = NULL;
     } else {

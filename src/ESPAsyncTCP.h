@@ -346,9 +346,7 @@ class AsyncServer {
     ~AsyncServer();
     void onClient(AcConnectHandler cb, void* arg);
 #if ASYNC_TCP_SSL_ENABLED
-#if ASYNC_TCP_SSL_AXTLS
     void beginSecure(const char *cert, const char *private_key_file, const char *password);
-#endif
     void onSslFileRequest(AcSSlFileHandler cb, void* arg);
 #endif
     void begin();

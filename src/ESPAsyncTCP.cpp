@@ -1241,18 +1241,18 @@ void AsyncServer::onClient(AcConnectHandler cb, void* arg){
 }
 
 #if ASYNC_TCP_SSL_ENABLED
-#if ASYNC_TCP_SSL_AXTLS
 void AsyncServer::beginSecure(const char *cert, const char *key, const char *password){
   if(_ssl_ctx){
     return;
   }
+#if ASYNC_TCP_SSL_AXTLS
   tcp_ssl_file(_s_cert, this);
+#endif
   _ssl_ctx = tcp_ssl_new_server_ctx(cert, key, password);
   if(_ssl_ctx){
     begin();
   }
 }
-#endif
 
 void AsyncServer::onSslFileRequest(AcSSlFileHandler cb, void* arg){
   _file_cb = cb;

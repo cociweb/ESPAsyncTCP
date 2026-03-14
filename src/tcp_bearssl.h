@@ -63,10 +63,7 @@
 #define TCP_SSL_TYPE_SERVER_ALL           0xF0
 
 // XXX: this is a dumb c/p from WiFiClientSecure **cpp**
-#ifdef __cplusplus
-extern "C" {
-#endif
-    // Private x509 decoder state
+    // Private x509 decoder state - available for both C and C++
     struct br_x509_insecure_context {
         const br_x509_class *vtable;
         bool done_cert;
@@ -78,9 +75,9 @@ extern "C" {
         br_x509_decoder_context ctx;
     };
     void br_x509_insecure_init(br_x509_insecure_context *ctx, int _use_fingerprint, const uint8_t _fingerprint[20], int _allow_self_signed);
-};
+
 #ifdef __cplusplus
-}
+extern "C" {
 #endif
 
 typedef struct SSL_ {

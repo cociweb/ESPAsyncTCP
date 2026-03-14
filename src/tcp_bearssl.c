@@ -490,10 +490,16 @@ static int tcp_ssl_outbuf_pump_int(struct tcp_pcb *tcp, tcp_ssl_t* tcp_ssl) {
 }
 
 int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName) {
-  return tcp_ssl_new_client_ex(tcp, hostName, BEARSSL_DEFAULT_IN_BUF_SIZE, BEARSSL_DEFAULT_OUT_BUF_SIZE);
+  tcp_ssl_params_t params = {
+    .use_insecure = false,
+    .use_self_signed = false,
+    .iobuf_in_size = BEARSSL_DEFAULT_IN_BUF_SIZE,
+    .iobuf_out_size = BEARSSL_DEFAULT_OUT_BUF_SIZE
+  };
+  return tcp_ssl_new_client_ex(tcp, hostName, &params);
 }
 
-int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf_size, int _out_buf_size){
+int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, const tcp_ssl_params_t* params){
   if(!tcp) {
     return ERR_TCP_SSL_INVALID_TCP;
   }
@@ -509,7 +515,7 @@ int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf
     return ERR_TCP_SSL_OUTOFMEMORY;
   }
 
-  tcp_ssl->ssl_ctx = tcp_ssl_ctx_new(_in_buf_size, _out_buf_size);
+  tcp_ssl->ssl_ctx = tcp_ssl_ctx_new(params->iobuf_in_size, params->iobuf_out_size);
   if(!tcp_ssl->ssl_ctx){
     TCP_SSL_DEBUG("tcp_ssl_new_client: failed to allocate ssl context\n");
     return ERR_TCP_SSL_OUTOFMEMORY;

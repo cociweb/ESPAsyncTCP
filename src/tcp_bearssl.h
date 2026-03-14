@@ -31,8 +31,10 @@
 
 #if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
 
+#ifdef __cplusplus
 #include "tcp_bearssl_helpers.h"
 #include <BearSSLHelpers.h>
+#endif
 
 #if BEARSSL_DEBUG
 #define DEBUG_BSSL(...) TCP_SSL_DEBUG(__VA_ARGS__)

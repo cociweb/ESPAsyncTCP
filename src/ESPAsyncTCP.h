@@ -258,7 +258,7 @@ class AsyncClient {
     uint32_t getHandshakeTimeout();
     void setHandshakeTimeout(uint32_t timeout);//no handshake timeout for the connection in milliseconds
 #endif
-#if DEBUG_ESP_ASYNC_TCP
+#endif
 
     size_t write(const char* data);
     size_t write(const char* data, size_t size, uint8_t apiflags=0); //only when canSend() == true

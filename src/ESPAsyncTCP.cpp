@@ -1252,11 +1252,14 @@ void AsyncServer::beginSecure(const char *cert, const char *key, const char *pas
     begin();
   }
 }
+#endif
 
 void AsyncServer::onSslFileRequest(AcSSlFileHandler cb, void* arg){
   _file_cb = cb;
   _file_cb_arg = arg;
 }
+
+#if ASYNC_TCP_SSL_AXTLS
 int AsyncServer::_cert(const char *filename, uint8_t **buf){
   if(_file_cb){
     return _file_cb(_file_cb_arg, filename, buf);

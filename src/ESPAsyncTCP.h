@@ -316,8 +316,8 @@ class AsyncClient {
 };
 
 #if ASYNC_TCP_SSL_ENABLED
-#if ASYNC_TCP_SSL_AXTLS
 typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> AcSSlFileHandler;
+#if ASYNC_TCP_SSL_AXTLS
 #endif
 struct pending_pcb;
 #endif
@@ -334,10 +334,8 @@ class AsyncServer {
 #if ASYNC_TCP_SSL_ENABLED
     struct pending_pcb * _pending;
     SSL_CTX * _ssl_ctx;
-#if ASYNC_TCP_SSL_AXTLS
     AcSSlFileHandler _file_cb;
     void* _file_cb_arg;
-#endif
 #ifdef DEBUG_MORE
     int _event_count[EE_MAX];
 #endif
@@ -350,8 +348,8 @@ class AsyncServer {
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_AXTLS
     void beginSecure(const char *cert, const char *private_key_file, const char *password);
-    void onSslFileRequest(AcSSlFileHandler cb, void* arg);
 #endif
+    void onSslFileRequest(AcSSlFileHandler cb, void* arg);
 #endif
     void begin();
     void end();

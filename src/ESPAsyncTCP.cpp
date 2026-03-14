@@ -1207,10 +1207,8 @@ AsyncServer::AsyncServer(IPAddress addr, uint16_t port)
 #if ASYNC_TCP_SSL_ENABLED
   , _pending(NULL)
   , _ssl_ctx(NULL)
-#if ASYNC_TCP_SSL_AXTLS
   , _file_cb(0)
   , _file_cb_arg(0)
-#endif
 #endif
 {}
 
@@ -1224,10 +1222,8 @@ AsyncServer::AsyncServer(uint16_t port)
 #if ASYNC_TCP_SSL_ENABLED
   , _pending(NULL)
   , _ssl_ctx(NULL)
-#if ASYNC_TCP_SSL_AXTLS
   , _file_cb(0)
   , _file_cb_arg(0)
-#endif
 #endif
 {}
 
@@ -1259,7 +1255,6 @@ void AsyncServer::onSslFileRequest(AcSSlFileHandler cb, void* arg){
   _file_cb_arg = arg;
 }
 
-#if ASYNC_TCP_SSL_AXTLS
 int AsyncServer::_cert(const char *filename, uint8_t **buf){
   if(_file_cb){
     return _file_cb(_file_cb_arg, filename, buf);
@@ -1271,7 +1266,6 @@ int AsyncServer::_cert(const char *filename, uint8_t **buf){
 int AsyncServer::_s_cert(void *arg, const char *filename, uint8_t **buf){
   return reinterpret_cast<AsyncServer*>(arg)->_cert(filename, buf);
 }
-#endif
 #endif
 
 void AsyncServer::begin(){

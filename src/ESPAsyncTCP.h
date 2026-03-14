@@ -317,8 +317,6 @@ class AsyncClient {
 
 #if ASYNC_TCP_SSL_ENABLED
 typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> AcSSlFileHandler;
-#if ASYNC_TCP_SSL_AXTLS
-#endif
 struct pending_pcb;
 #endif
 
@@ -364,10 +362,8 @@ class AsyncServer {
     int incEventCount(size_t ee) { return ++_event_count[ee];}
 #endif
 #if ASYNC_TCP_SSL_ENABLED
-#if ASYNC_TCP_SSL_AXTLS
     int _cert(const char *filename, uint8_t **buf);
     static int _s_cert(void *arg, const char *filename, uint8_t **buf);
-#endif
     err_t _poll(tcp_pcb* pcb);
     err_t _recv(tcp_pcb *pcb, struct pbuf *pb, err_t err);
     static err_t _s_poll(void *arg, struct tcp_pcb *tpcb);

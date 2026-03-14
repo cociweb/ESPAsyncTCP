@@ -24,6 +24,7 @@
  * Adopted from tcp_axtls.c by Zhenyu Wu @2018/02
  */
 #include <async_config.h>
+#include <memory>
 
 #if ASYNC_TCP_SSL_ENABLED && ASYNC_TCP_SSL_BEARSSL
 

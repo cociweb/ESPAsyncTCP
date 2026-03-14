@@ -549,7 +549,7 @@ void AsyncClient::_close(){
     if(err == ERR_OK) {
       _pcb = NULL;
     } else {
-      err = abort();
+      abort();
     }
     if(_discard_cb)
       _discard_cb(_discard_cb_arg, this);

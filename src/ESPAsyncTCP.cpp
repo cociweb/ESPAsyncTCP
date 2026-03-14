@@ -121,7 +121,7 @@ void ACErrorTracker::onErrorEvent(AsNotifyHandler cb, void *arg) {
 
 void ACErrorTracker::setCloseError(err_t e) {
   if (e != ERR_OK)
-    ASYNC_TCP_DEBUG("setCloseError() to: %s(%ld)\n", _client->errorToString(e), e);
+    ASYNC_TCP_DEBUG("setCloseError() to: %s(%d)\n", _client->errorToString(e), e);
   if(_errored == EE_OK)
     _close_error = e;
 }
@@ -431,7 +431,7 @@ size_t AsyncClient::add(const char* data, size_t size, uint8_t apiflags) {
   size_t will_send = (room < size) ? room : size;
   err_t err = tcp_write(_pcb, data, will_send, apiflags);
   if(err != ERR_OK) {
-    ASYNC_TCP_DEBUG("_add[%u]: tcp_write() returned err: %s(%ld)\n", getConnectionId(), errorToString(err), err);
+    ASYNC_TCP_DEBUG("_add[%u]: tcp_write() returned err: %s(%d)\n", getConnectionId(), errorToString(err), err);
     return 0;
   }
   _tx_unacked_len += will_send;
@@ -485,7 +485,7 @@ void AsyncClient::_connected(std::shared_ptr<ACErrorTracker>& errorTracker, void
   // Based on that wording and emoji lets just handle it now.
   // After all, the API does allow for an err != ERR_OK.
   if(NULL == pcb || ERR_OK != err) {
-    ASYNC_TCP_DEBUG("_connected[%u]:%s err: %s(%ld)\n", errorTracker->getConnectionId(), ((NULL == pcb) ? " NULL == pcb!," : ""), errorToString(err), err);
+    ASYNC_TCP_DEBUG("_connected[%u]:%s err: %s(%d)\n", errorTracker->getConnectionId(), ((NULL == pcb) ? " NULL == pcb!," : ""), errorToString(err), err);
     errorTracker->setCloseError(err);
     errorTracker->setErrored(EE_CONNECTED_CB);
     _pcb = reinterpret_cast<tcp_pcb*>(pcb);
@@ -559,7 +559,7 @@ void AsyncClient::_close(){
 }
 
 void AsyncClient::_error(err_t err) {
-  ASYNC_TCP_DEBUG("_error[%u]:%s err: %s(%ld)\n", getConnectionId(), ((NULL == _pcb) ? " NULL == _pcb!," : ""), errorToString(err), err);
+  ASYNC_TCP_DEBUG("_error[%u]:%s err: %s(%d)\n", getConnectionId(), ((NULL == _pcb) ? " NULL == _pcb!," : ""), errorToString(err), err);
   if(_pcb){
 #if ASYNC_TCP_SSL_ENABLED
     if(_pcb_secure){
@@ -609,7 +609,7 @@ void AsyncClient::_sent(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
 #if ASYNC_TCP_SSL_BEARSSL
     int pumped = tcp_ssl_outbuf_pump(pcb);
 #endif
-    if(!_handshake_done) return ERR_OK;
+    if(!_handshake_done) return;
 #if ASYNC_TCP_SSL_BEARSSL
     if(pumped) {
       //_pcb_busy = true;
@@ -641,7 +641,7 @@ void AsyncClient::_recv(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
   // a non-ERR_OK value.
   // https://www.nongnu.org/lwip/2_1_x/tcp_8h.html#a780cfac08b02c66948ab94ea974202e8
   if(NULL == pcb || ERR_OK != err){
-    ASYNC_TCP_DEBUG("_recv[%u]:%s err: %s(%ld)\n", errorTracker->getConnectionId(), ((NULL == pcb) ? " NULL == pcb!," : ""), errorToString(err), err);
+    ASYNC_TCP_DEBUG("_recv[%u]:%s err: %s(%d)\n", errorTracker->getConnectionId(), ((NULL == pcb) ? " NULL == pcb!," : ""), errorToString(err), err);
     ASYNC_TCP_ASSERT(ERR_ABRT != err);
     errorTracker->setCloseError(err);
     errorTracker->setErrored(EE_RECV_CB);
@@ -675,7 +675,7 @@ void AsyncClient::_recv(std::shared_ptr<ACErrorTracker>& errorTracker, tcp_pcb* 
   }
 
   if(pb == NULL){
-    ASYNC_TCP_DEBUG("_recv[%u]: pb == NULL! Closing... %ld\n", errorTracker->getConnectionId(), err);
+    ASYNC_TCP_DEBUG("_recv[%u]: pb == NULL! Closing... %d\n", errorTracker->getConnectionId(), err);
     _close();
     return;
   }
@@ -1351,7 +1351,7 @@ err_t AsyncServer::_accept(tcp_pcb* pcb, err_t err){
     // An error code if there has been an error accepting. Only return ERR_ABRT
     // if you have called tcp_abort from within the callback function!
     // eg. 2.1.0 could call with error on failure to allocate pcb.
-    ASYNC_TCP_DEBUG("_accept:%s err: %ld\n", ((NULL == pcb) ? " NULL == pcb!," : ""), err);
+    ASYNC_TCP_DEBUG("_accept:%s err: %d\n", ((NULL == pcb) ? " NULL == pcb!," : ""), err);
     ASYNC_TCP_ASSERT(ERR_ABRT != err);
 #ifdef DEBUG_MORE
     incEventCount(EE_ACCEPT_CB);

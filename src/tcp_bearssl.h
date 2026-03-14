@@ -71,21 +71,33 @@
 #define TCP_SSL_TYPE_SERVER_ALL           0xF0
 
 // XXX: this is a dumb c/p from WiFiClientSecure **cpp**
-// Private x509 decoder state - simplified version for C/C++ compatibility
+// Note: br_x509_insecure_context is defined in tcp_bearssl.c for C
+// and here for C++ to avoid compilation issues
+
+#ifdef __cplusplus
+// BearSSL doesn't define a true insecure decoder, so we make one ourselves
+// from the simple parser.  It generates the issuer and subject hashes and
+// the SHA1 fingerprint, only one (or none!) of which will be used to
+// "verify" the certificate.
+
+// Private x509 decoder state - C++ version
 struct br_x509_insecure_context {
-    void *vtable;  // Use void* instead of br_x509_class*
+    const br_x509_class *vtable;
     bool done_cert;
     const uint8_t *match_fingerprint;
+    br_sha1_context sha1_cert;
     bool allow_self_signed;
-    // Simplified - remove the complex BearSSL context types that are causing issues
-    void *sha1_cert;
-    void *sha256_subject;
-    void *sha256_issuer;
-    void *ctx;
+    br_sha256_context sha256_subject;
+    br_sha256_context sha256_issuer;
+    br_x509_decoder_context ctx;
 };
 
-// Function declaration available for both C and C++
 void br_x509_insecure_init(br_x509_insecure_context *ctx, int _use_fingerprint, const uint8_t _fingerprint[20], int _allow_self_signed);
+#else
+// Forward declaration for C - structure defined in tcp_bearssl.c
+struct br_x509_insecure_context;
+void br_x509_insecure_init(struct br_x509_insecure_context *ctx, int _use_fingerprint, const uint8_t _fingerprint[20], int _allow_self_signed);
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,7 +113,7 @@ typedef struct SSL_CTX_ {
 
 #ifdef __cplusplus
   std::shared_ptr<br_x509_minimal_context> _x509_minimal;
-  std::shared_ptr<struct br_x509_insecure_context> _x509_insecure;
+  std::shared_ptr<br_x509_insecure_context> _x509_insecure;
   std::shared_ptr<br_x509_knownkey_context> _x509_knownkey;
   std::shared_ptr<unsigned char> _iobuf_in;
   std::shared_ptr<unsigned char> _iobuf_out;

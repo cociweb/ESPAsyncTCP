@@ -42,6 +42,23 @@
 
 #include <tcp_bearssl.h>
 
+// BearSSL doesn't define a true insecure decoder, so we make one ourselves
+// from the simple parser.  It generates the issuer and subject hashes and
+// the SHA1 fingerprint, only one (or none!) of which will be used to
+// "verify" the certificate.
+
+// Private x509 decoder state
+struct br_x509_insecure_context {
+    const br_x509_class *vtable;
+    bool done_cert;
+    const uint8_t *match_fingerprint;
+    br_sha1_context sha1_cert;
+    bool allow_self_signed;
+    br_sha256_context sha256_subject;
+    br_sha256_context sha256_issuer;
+    br_x509_decoder_context ctx;
+};
+
 #ifndef BEARSSL_HEAPDEBUG
 #define BEARSSL_HEAPDEBUG   0
 #endif

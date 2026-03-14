@@ -36,9 +36,12 @@
 #include "lwip/inet.h"
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdarg.h>
+#include <memory>
 
-#include "tcp_bearssl.h"
+// Include BearSSL headers for type definitions
+#include <bearssl/bearssl.h>
+
+#include <tcp_bearssl.h>
 
 #ifndef BEARSSL_HEAPDEBUG
 #define BEARSSL_HEAPDEBUG   1

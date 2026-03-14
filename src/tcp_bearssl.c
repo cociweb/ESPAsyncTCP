@@ -514,13 +514,13 @@ int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, int _in_buf
     return ERR_TCP_SSL_OUTOFMEMORY;
   }
 
-  tcp_ssl->ssl = br_ssl_client_new(tcp, tcp_ssl->ssl_ctx);
-  if(!tcp_ssl->ssl){
+  tcp_ssl->ssl->_cc = br_ssl_client_new(tcp, tcp_ssl->ssl_ctx);
+  if(!tcp_ssl->ssl->_cc){
     TCP_SSL_DEBUG("tcp_ssl_new_client: failed to allocate ssl client\n");
     return ERR_TCP_SSL_OUTOFMEMORY;
   }
 
-  if(!br_ssl_client_reset(tcp_ssl->ssl, hostName, 0)) {
+  if(!br_ssl_client_reset(tcp_ssl->ssl->_cc, hostName, 0)) {
     TCP_SSL_DEBUG("tcp_ssl_new_client: failed to reset\n");
     return ERR_TCP_SSL_INVALID_SSL_STATE;
   }
@@ -675,7 +675,7 @@ static void tcp_ssl_handshake_pump() {
         br_ssl_engine_context *engine = tcp_ssl_hsptr->ssl_ctx->_eng;
         unsigned state = br_ssl_engine_current_state(engine);
         while ((state & BR_SSL_RECVREC) && buflen) {
-            int _recv_len = 0;
+            size_t _recv_len = 0;
             unsigned char *recv_buf = br_ssl_engine_recvrec_buf(engine, &_recv_len);
             if(recv_buf) {
                 int to_copy = _recv_len < buflen ? _recv_len : buflen;
@@ -778,7 +778,7 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
   int pbuf_offset = 0;
   int total_bytes = 0;
   do {
-    int _recv_len = 0;
+    size_t _recv_len = 0;
     unsigned char *recv_buf = br_ssl_engine_recvrec_buf(engine, &_recv_len);
     if(recv_buf) {
       int to_copy = _recv_len < pbuf_size ? _recv_len : pbuf_size;
@@ -793,7 +793,7 @@ int tcp_ssl_read(struct tcp_pcb *tcp, struct pbuf *p) {
     system_soft_wdt_feed();
     state = br_ssl_engine_current_state(engine);
     if(state & BR_SSL_RECVAPP) {
-      _recv_len = 0;
+      size_t _recv_len = 0;
       unsigned char *recv_buf = br_ssl_engine_recvapp_buf(engine, &_recv_len);
       if(recv_buf) {
         READ_DEBUG("tcp_ssl_read: app data (%d)\n", _recv_len);

@@ -86,13 +86,22 @@ typedef struct SSL_ {
 typedef struct SSL_CTX_ {
   br_ssl_engine_context *_eng;
 
+#ifdef __cplusplus
   std::shared_ptr<br_x509_minimal_context> _x509_minimal;
   std::shared_ptr<struct br_x509_insecure_context> _x509_insecure;
   std::shared_ptr<br_x509_knownkey_context> _x509_knownkey;
   std::shared_ptr<unsigned char> _iobuf_in;
   std::shared_ptr<unsigned char> _iobuf_out;
-
   std::shared_ptr<uint16_t> _cipher_list;
+#else
+  // C-compatible raw pointers
+  br_x509_minimal_context *_x509_minimal;
+  struct br_x509_insecure_context *_x509_insecure;
+  br_x509_knownkey_context *_x509_knownkey;
+  unsigned char *_iobuf_in;
+  unsigned char *_iobuf_out;
+  uint16_t *_cipher_list;
+#endif
 
   time_t _now;
   const BearSSL::X509List *_ta;

@@ -426,8 +426,8 @@ static br_ssl_client_context* br_ssl_client_new(struct tcp_pcb *tcp, SSL_CTX* ct
         ctx->_eng = engine;
         ctx->_x509_minimal = malloc(sizeof(br_x509_minimal_context));
         br_x509_minimal_init(ctx->_x509_minimal, &br_sha256_vtable, NULL, 0);
-        br_x509_minimal_set_rsa(&ctx->_x509_minimal, br_ssl_engine_get_rsavrfy(engine));
-        br_x509_minimal_set_ecdsa(&ctx->_x509_minimal, br_ssl_engine_get_ec(engine), br_ssl_engine_get_ecdsa(engine));
+        br_x509_minimal_set_rsa(ctx->_x509_minimal, br_ssl_engine_get_rsavrfy(engine));
+        br_x509_minimal_set_ecdsa(ctx->_x509_minimal, br_ssl_engine_get_ec(engine), br_ssl_engine_get_ecdsa(engine));
         for (int id = br_md5_ID; id <= br_sha512_ID; id++) {
             const br_hash_class *hc;
             hc = hashes[id - 1];

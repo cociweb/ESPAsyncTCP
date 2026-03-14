@@ -63,7 +63,9 @@
 #define TCP_SSL_TYPE_SERVER_ALL           0xF0
 
 // XXX: this is a dumb c/p from WiFiClientSecure **cpp**
+#ifdef __cplusplus
 extern "C" {
+#endif
     // Private x509 decoder state
     struct br_x509_insecure_context {
         const br_x509_class *vtable;
@@ -77,6 +79,9 @@ extern "C" {
     };
     void br_x509_insecure_init(br_x509_insecure_context *ctx, int _use_fingerprint, const uint8_t _fingerprint[20], int _allow_self_signed);
 };
+#ifdef __cplusplus
+}
+#endif
 
 typedef struct SSL_ {
   br_ssl_client_context* _cc;
@@ -104,7 +109,11 @@ typedef struct SSL_CTX_ {
 #endif
 
   time_t _now;
+#ifdef __cplusplus
   const BearSSL::X509List *_ta;
+#else
+  const void *_ta;  // C-compatible version
+#endif
   int _iobuf_in_size;
   int _iobuf_out_size;
   int _pending_send;
@@ -140,8 +149,22 @@ uint8_t tcp_ssl_has_client();
 #define BEARSSL_DEFAULT_IN_BUF_SIZE     SSL_DEFAULT_BUF_SIZE
 #define BEARSSL_DEFAULT_OUT_BUF_SIZE    SSL_MINIMUM_BUF_SIZE
 
-int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName);
+#ifdef __cplusplus
+// C++ version with reference parameter
 int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, SSL_CTX_PARAMS& params);
+#else
+// C-compatible version
+typedef struct {
+  bool use_insecure;
+  bool use_self_signed;
+  int iobuf_in_size;
+  int iobuf_out_size;
+} tcp_ssl_params_t;
+
+int tcp_ssl_new_client_ex(struct tcp_pcb *tcp, const char* hostName, const tcp_ssl_params_t* params);
+#endif
+
+int tcp_ssl_new_client(struct tcp_pcb *tcp, const char* hostName);
 
 SSL_CTX * tcp_ssl_new_server_ctx(const char *cert, const char *private_key_file, const char *password);
 int tcp_ssl_new_server(struct tcp_pcb *tcp, SSL_CTX* ssl_ctx);

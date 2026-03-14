@@ -317,7 +317,7 @@ class AsyncClient {
 
 #if ASYNC_TCP_SSL_ENABLED
 #if ASYNC_TCP_SSL_AXTLS
-typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> cSSlFileHandler;
+typedef std::function<int(void* arg, const char *filename, uint8_t **buf)> AcSSlFileHandler;
 #endif
 struct pending_pcb;
 #endif

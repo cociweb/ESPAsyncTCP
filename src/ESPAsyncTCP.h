@@ -259,7 +259,10 @@ class AsyncClient {
     void setHandshakeTimeout(uint32_t timeout);//no handshake timeout for the connection in milliseconds
 #endif
 #if DEBUG_ESP_ASYNC_TCP
+    // Debug-specific methods only
+#endif
 
+    // Essential methods always available
     size_t write(const char* data);
     size_t write(const char* data, size_t size, uint8_t apiflags=0); //only when canSend() == true
 
@@ -280,31 +283,6 @@ class AsyncClient {
     uint16_t getRemotePort();
     uint16_t getLocalPort();
 
-    IPAddress remoteIP();
-    uint16_t  remotePort();
-    IPAddress localIP();
-    uint16_t  localPort();
-
-    void onConnect(AcConnectHandler cb, void* arg = 0);     //on successful connect
-    void onDisconnect(AcConnectHandler cb, void* arg = 0);  //disconnected
-    void onAck(AcAckHandler cb, void* arg = 0);             //ack received
-    void onError(AcErrorHandler cb, void* arg = 0);         //unsuccessful connect or error
-    void onData(AcDataHandler cb, void* arg = 0);           //data received (called if onPacket is not used)
-    void onPacket(AcPacketHandler cb, void* arg = 0);       //data received
-    void onTimeout(AcTimeoutHandler cb, void* arg = 0);     //ack timeout
-    void onPoll(AcConnectHandler cb, void* arg = 0);        //every 2*TCP_TMR_INTERVAL when connected
-
-#if ASYNC_TCP_SSL_ENABLED
-#if ASYNC_TCP_SSL_BEARSSL
-    void onSSLCertLookup(AcSSLCertLookupHandler cb, void* arg = 0); //when ssl handshake need a trust anchor certificate
-
-    void setSSLParams(SSL_CTX_PARAMS& params);
-#endif
-#endif
-
-#endif
-
-    // Essential methods always available
     IPAddress remoteIP();
     uint16_t  remotePort();
     IPAddress localIP();
